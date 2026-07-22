@@ -82,7 +82,7 @@ function BootScreen({
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 font-sans">
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 p-8 max-w-md w-full text-center">
         <img
-          src="/fluence_logo.png"
+          src={`${import.meta.env.BASE_URL}fluence_logo.png`}
           alt=""
           aria-hidden="true"
           className="w-14 h-14 object-contain mx-auto mb-3"
@@ -560,7 +560,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               reads as a layout bug rather than a tagline. */}
           <div className="flex items-center gap-3 shrink-0">
             <img
-              src="/fluence_logo.png"
+              src={`${import.meta.env.BASE_URL}fluence_logo.png`}
               alt=""
               aria-hidden="true"
               className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 object-contain"

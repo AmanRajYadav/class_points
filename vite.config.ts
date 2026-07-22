@@ -5,6 +5,12 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages serves a project site from /<repo>/, so every asset URL
+    // needs that prefix. Applied in dev and preview too, not just builds: if
+    // this only took effect for `build`, the dev server would serve from `/`
+    // and quietly hide every path bug until it reached production.
+    // Override with BASE_PATH=/ for a custom domain or a root-hosted deploy.
+    base: process.env.BASE_PATH ?? '/class_points/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

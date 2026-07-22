@@ -22,9 +22,14 @@ export function registerServiceWorker() {
     return;
   }
 
+  // Under GitHub Pages the app lives at /<repo>/, and a worker can only
+  // control pages at or below its own path — registering "/sw.js" would both
+  // 404 and claim the wrong scope.
+  const base = import.meta.env.BASE_URL;
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      .register(`${base}sw.js`, { scope: base })
       .then((registration) => {
         // Ask the browser to look for a new worker whenever the tab is
         // brought back to the foreground.

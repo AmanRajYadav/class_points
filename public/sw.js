@@ -1,17 +1,22 @@
 // Bump this string on every deploy that changes the app shell. Changing it
 // makes `activate` drop every older cache.
-const CACHE_NAME = "fluence-cache-v4";
+const CACHE_NAME = "fluence-cache-v5";
+
+// Everything below is resolved against the worker's own location, never the
+// domain root. On GitHub Pages the app is served from /<repo>/, so hardcoded
+// "/..." paths would miss every file.
+const BASE = new URL("./", self.location).pathname;
 
 // Only truly static, rarely-changing files are precached. The HTML and the
 // JS/CSS bundles are deliberately NOT in here: caching those with a
 // stale-while-revalidate strategy is what made a refresh keep showing the old
 // build (and, with it, stale data) until the second reload.
 const PRECACHE_URLS = [
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/fluence_logo.png",
-];
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./fluence_logo.png",
+].map((path) => new URL(path, self.location).href);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -35,10 +40,11 @@ self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
-// Vite emits content-hashed filenames under /assets/, so those are immutable
-// and safe to serve from cache forever.
+// Vite emits content-hashed filenames under <base>/assets/, so those are
+// immutable and safe to serve from cache forever.
 const isImmutableAsset = (url) =>
-  url.pathname.startsWith("/assets/") || /\.(png|jpe?g|svg|webp|woff2?)$/.test(url.pathname);
+  url.pathname.startsWith(`${BASE}assets/`) ||
+  /\.(png|jpe?g|svg|webp|woff2?)$/.test(url.pathname);
 
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
@@ -53,7 +59,7 @@ async function networkFirst(request) {
     if (cached) return cached;
     // A navigation with nothing cached: fall back to the shell if we have one.
     if (request.mode === "navigate") {
-      const shell = await cache.match("/index.html");
+      const shell = await cache.match(new URL("./index.html", self.location).href);
       if (shell) return shell;
     }
     throw err;
@@ -81,6 +87,8 @@ self.addEventListener("fetch", (event) => {
   // Supabase REST and realtime calls: caching those would serve stale scores.
   if (url.origin !== self.location.origin) return;
   if (!url.protocol.startsWith("http")) return;
+  // Another project on the same github.io domain is none of our business.
+  if (!url.pathname.startsWith(BASE)) return;
 
   event.respondWith(isImmutableAsset(url) ? cacheFirst(request) : networkFirst(request));
 });

@@ -1,23 +1,71 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+  <img src="public/fluence_logo.png" width="96" alt="Fluence" />
+
+  <h1>FLUENCE</h1>
+  <p><em>Question Everything</em></p>
 </div>
 
-# Run and deploy your AI Studio app
+Classroom scoreboard for the Mangla and Sarkanda branches. Daily points for
+punctuality, homework, quizzes and bonuses; branch leaderboards; and a trophy
+awarded at the end of every half-month period.
 
-This contains everything you need to run your app locally.
+Built with React, Vite and Tailwind, backed by Supabase.
 
-View your app in AI Studio: https://ai.studio/apps/139f67df-46f7-4952-8513-f3a9347427ad
+## Run locally
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js 20+
 
 1. Install dependencies:
-   `npm install`
-2. Create the database tables — see [README-SUPABASE.md](README-SUPABASE.md).
-   The app stores all points in Supabase and will show a setup screen until the
-   schema exists.
-3. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in [.env.local](.env.local)
-4. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Create the database tables and the teacher account — see
+   [README-SUPABASE.md](README-SUPABASE.md). The app shows a setup screen until
+   the schema exists.
+3. Copy [.env.example](.env.example) to `.env.local` and fill in
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+4. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+
+The app is served from a sub-path (`http://localhost:3000/class_points/`),
+matching how GitHub Pages hosts it. That is deliberate — serving dev from `/`
+hides path bugs until they reach production. Vite prints the full URL on
+startup.
+
+## Deploying
+
+Pushing to `main` builds and publishes to GitHub Pages via
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+
+**One-time setup:**
+
+1. **Settings → Pages → Source: GitHub Actions**
+2. **Settings → Secrets and variables → Actions → Variables** — add:
+
+   | Name | Value |
+   | --- | --- |
+   | `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+   | `VITE_SUPABASE_ANON_KEY` | your anon public key |
+
+   Repository *variables*, not secrets: Vite inlines these into the bundle at
+   build time, so they are public either way, and secrets would be masked in
+   the build logs for no benefit. Row level security is what protects the data
+   — see [README-SUPABASE.md](README-SUPABASE.md#security-model).
+
+   The workflow fails the build if these are missing rather than deploying an
+   app stuck on its "not configured" screen.
+
+**Hosting somewhere else?** Set `BASE_PATH=/` when building, or edit the
+default in [vite.config.ts](vite.config.ts).
+
+## Layout
+
+| Path | What it holds |
+| --- | --- |
+| `src/lib/db.ts` | Supabase reads, writes, and the realtime subscription |
+| `src/lib/useAppState.ts` | Loads the board; optimistic edits + durable write queue |
+| `src/lib/storage.ts` | Score maths, half-month period rules, offline cache |
+| `src/lib/auth.ts` | Teacher session |
+| `supabase/schema.sql` | Tables, RLS policies, rollover function, cron job |
