@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+
+# Secrets. .env.local holds the Supabase URL and anon key; only the template
+# is tracked.
+.env*
+!.env.example
+
+# Machine-specific Claude Code permissions
+.claude/settings.local.json

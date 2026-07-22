@@ -1,0 +1,6 @@
+{
+  "name": "Classroom Points & Trophy Tracker",
+  "description": "A playful and student-friendly classroom points app and leaderboard with a 15-day trophy cycle and history log.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
