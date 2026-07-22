@@ -202,7 +202,7 @@ export function useAppState() {
       setStatus("error");
       setError(
         new Error(
-          "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart the dev server."
+          "Supabase is not configured. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are read when the app is built — set them in .env.local and restart the dev server, or in the repository's Actions variables and re-run the deploy."
         )
       );
       return () => {

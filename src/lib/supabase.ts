@@ -1,7 +1,18 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+/**
+ * An unset GitHub Actions variable arrives as an empty string, not as
+ * undefined, so `??` would happily pass "" straight through to createClient —
+ * which throws "supabaseUrl is required" at module load and takes the whole
+ * app down before it can render the setup screen. Treat blank as absent.
+ */
+const configured = (value: unknown): string | undefined => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const url = configured(import.meta.env.VITE_SUPABASE_URL);
+const anonKey = configured(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 /**
  * The single teacher account. Only the password is ever typed — the unlock
@@ -9,7 +20,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
  * in Supabase Auth rather than in the browser.
  */
 export const TEACHER_EMAIL =
-  (import.meta.env.VITE_TEACHER_EMAIL as string | undefined) ?? "teacher@classpoints.app";
+  configured(import.meta.env.VITE_TEACHER_EMAIL) ?? "teacher@classpoints.app";
 
 /**
  * True when the app was built with Supabase credentials. When false the UI

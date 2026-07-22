@@ -33,6 +33,23 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # Checked before building, against the values themselves. Grepping the
+      # bundle afterwards does not work: when these are blank the fallback
+      # string is unreachable, so the minifier drops it and the grep finds
+      # nothing to complain about.
+      - name: Check Supabase credentials are present
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          missing=0
+          [ -n "$URL" ] || { echo "::error::VITE_SUPABASE_URL is not set."; missing=1; }
+          [ -n "$KEY" ] || { echo "::error::VITE_SUPABASE_ANON_KEY is not set."; missing=1; }
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Add them under Settings -> Secrets and variables -> Actions -> Variables, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Build
         env:
           # Vite inlines these at build time, so they must be present here or
@@ -46,10 +63,15 @@ jobs:
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Fail if the build did not pick up Supabase credentials
+      # Confirms Vite actually inlined the values, rather than the build
+      # merely having had them in its environment.
+      - name: Verify credentials reached the bundle
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
         run: |
-          if grep -rq "placeholder.supabase.co" dist/assets; then
-            echo "::error::Built without Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY under Settings -> Secrets and variables -> Actions -> Variables."
+          host=$(printf '%s' "$URL" | sed -E 's#^https?://##; s#/.*##')
+          if ! grep -rqF "$host" dist/assets; then
+            echo "::error::The built bundle does not contain $host — the Supabase URL was not inlined."
             exit 1
           fi
 
