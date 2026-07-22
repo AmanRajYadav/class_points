@@ -42,6 +42,16 @@ Pushing to `main` builds and publishes to GitHub Pages via
 **One-time setup:**
 
 1. **Settings → Pages → Source: GitHub Actions**
+
+   This one matters more than it looks. While the source is set to *Deploy from
+   a branch*, GitHub runs its own `pages build and deployment` workflow that
+   publishes the repository root verbatim — meaning the unbuilt `index.html`,
+   whose `<script src="/src/main.tsx">` does not exist on a static host. The
+   symptom is a blank page with `404` on `/src/main.tsx` and `/manifest.json`.
+
+   Both workflows run on every push, so which one you get is a race. Switching
+   the source to *GitHub Actions* removes the built-in one; nothing else does.
+
 2. **Settings → Secrets and variables → Actions → Variables** — add:
 
    | Name | Value |
@@ -56,6 +66,10 @@ Pushing to `main` builds and publishes to GitHub Pages via
 
    The workflow fails the build if these are missing rather than deploying an
    app stuck on its "not configured" screen.
+
+   Adding or changing a variable does **not** rebuild anything on its own.
+   Re-run the deploy afterwards: **Actions → Deploy to GitHub Pages → Run
+   workflow**.
 
 **Hosting somewhere else?** Set `BASE_PATH=/` when building, or edit the
 default in [vite.config.ts](vite.config.ts).
