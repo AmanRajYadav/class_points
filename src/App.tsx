@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
   Trophy,
-  Users,
   Award,
   Settings,
   Lock,
@@ -26,7 +25,12 @@ import {
   Cloud,
   Loader2,
   RefreshCw,
-  Database
+  Database,
+  ArrowLeft,
+  LayoutGrid,
+  TreePine,
+  Bookmark as BookmarkIcon,
+  Mic
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Student, DailyPoint, AppSettings, AppState } from "./types";
@@ -47,12 +51,21 @@ import {
 } from "./lib/storage";
 import { useAppState, SyncStatus } from "./lib/useAppState";
 import { changeTeacherPassword, signOutTeacher, useTeacherSession } from "./lib/auth";
+import { useRoute, View } from "./lib/useRoute";
+import { useHub } from "./lib/useHub";
+import { useStudentIdentity } from "./lib/identity";
 import { StudentAvatar, AVATAR_PRESETS } from "./components/StudentAvatar";
 import { TeacherLoginModal } from "./components/TeacherLoginModal";
 import { StudentDetailModal } from "./components/StudentDetailModal";
 import { QuickMark } from "./components/QuickMark";
 import { TrophyAnimationModal } from "./components/TrophyAnimationModal";
 import { PastRecords } from "./components/PastRecords";
+import { MasterMenu } from "./components/MasterMenu";
+import { ResourceList } from "./components/ResourceList";
+import { Park } from "./components/Park";
+import { BookmarksView } from "./components/BookmarksView";
+import { SummaryView } from "./components/SummaryView";
+import { AttendanceView } from "./components/AttendanceView";
 
 type AppController = ReturnType<typeof useAppState>;
 
@@ -162,6 +175,80 @@ function SyncBadge({
   );
 }
 
+/** Desktop rail entry. */
+function DeskNavItem({
+  icon: Icon,
+  label,
+  active,
+  onClick
+}: {
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all border-2 text-left cursor-pointer ${
+        active
+          ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100"
+          : "bg-white text-slate-500 border-slate-200/60 hover:bg-slate-50"
+      }`}
+    >
+      <Icon className="w-4.5 h-4.5" />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function DeskSubItem({
+  label,
+  active,
+  onClick
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-left px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+        active ? "bg-indigo-50 text-indigo-700" : "text-slate-400 hover:text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Bottom bar entry (mobile). */
+function TabButton({
+  icon: Icon,
+  label,
+  active,
+  onClick
+}: {
+  icon: React.ElementType;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-1 transition-all ${
+        active ? "text-indigo-600 scale-105" : "text-slate-400"
+      }`}
+      style={{ minWidth: "55px", minHeight: "48px" }}
+    >
+      <Icon className="w-5.5 h-5.5" />
+      <span className="text-[9px] font-black uppercase tracking-wider">{label}</span>
+    </button>
+  );
+}
+
 function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const { mutate, replaceAll, status, pendingCount, retry, celebration, dismissCelebration, celebrate } = app;
 
@@ -171,7 +258,35 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const { isTeacher } = useTeacherSession();
   const editorMode = isTeacher;
 
-  const [activeTab, setActiveTab] = useState<"students" | "leaderboard" | "hall" | "settings">("students");
+  // --- Navigation ---
+  // The URL hash is the single source of truth for where we are, so Android's
+  // back button walks back through the app instead of closing it.
+  const { route, navigate, back } = useRoute();
+  const { studentId, choose: chooseStudent } = useStudentIdentity();
+  const hub = useHub(studentId);
+
+  // The four original screens still key off `activeTab`; it is now derived from
+  // the route rather than held in state. Anything outside Points/Config leaves
+  // it as "none", which switches every one of those blocks off.
+  const activeTab: "students" | "leaderboard" | "hall" | "settings" | "none" =
+    route.view === "config"
+      ? "settings"
+      : route.view !== "points"
+        ? "none"
+        : route.tab === "standings"
+          ? "leaderboard"
+          : route.tab === "hall"
+            ? "hall"
+            : "students";
+
+  const setActiveTab = (tab: "students" | "leaderboard" | "hall" | "settings") => {
+    if (tab === "settings") navigate({ view: "config" });
+    else
+      navigate({
+        view: "points",
+        tab: tab === "leaderboard" ? "standings" : tab === "hall" ? "hall" : "class",
+      });
+  };
 
   // --- Search & Filter ---
   const [studentSearch, setStudentSearch] = useState<string>("");
@@ -662,59 +777,193 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
       {/* Main Body Content with Sidebar/Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 pb-24 lg:pb-6">
-        {/* Navigation Tabs (Desktop only; hidden on mobile in favor of sticky bottom tab bar) */}
+        {/* Desktop rail. On mobile this is replaced by the master menu plus
+            the bottom bar, so nothing here needs a mobile fallback. */}
         <div className="hidden lg:flex lg:flex-col lg:col-span-1 gap-2">
-          <button
-            onClick={() => setActiveTab("students")}
-            className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-3 px-4 py-3.5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all border-2 text-center lg:text-left cursor-pointer ${
-              activeTab === "students"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 scale-102"
-                : "bg-white text-slate-500 border-slate-200/60 hover:bg-slate-50"
-            }`}
-          >
-            <Users className="w-4.5 h-4.5" />
-            <span>Students Grid</span>
-          </button>
+          <DeskNavItem icon={LayoutGrid} label="Menu"       active={route.view === "menu"}       onClick={() => navigate({ view: "menu" })} />
+          <DeskNavItem icon={Trophy}     label="Points"     active={route.view === "points"}     onClick={() => setActiveTab("students")} />
+          <DeskNavItem icon={TreePine}   label="Park"       active={route.view === "park"}       onClick={() => navigate({ view: "park" })} />
+          <DeskNavItem icon={BookmarkIcon} label="Saved"    active={route.view === "bookmarks"}  onClick={() => navigate({ view: "bookmarks" })} />
+          {editorMode && (
+            <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
+          )}
+          <DeskNavItem icon={Settings}   label="Settings"   active={route.view === "config"}     onClick={() => setActiveTab("settings")} />
 
-          <button
-            onClick={() => setActiveTab("leaderboard")}
-            className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-3 px-4 py-3.5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all border-2 text-center lg:text-left cursor-pointer ${
-              activeTab === "leaderboard"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 scale-102"
-                : "bg-white text-slate-500 border-slate-200/60 hover:bg-slate-50"
-            }`}
-          >
-            <Trophy className="w-4.5 h-4.5" />
-            <span>Leaderboard</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("hall")}
-            className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-3 px-4 py-3.5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all border-2 text-center lg:text-left cursor-pointer ${
-              activeTab === "hall"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 scale-102"
-                : "bg-white text-slate-500 border-slate-200/60 hover:bg-slate-50"
-            }`}
-          >
-            <Award className="w-4.5 h-4.5" />
-            <span>Hall of Fame</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`flex-1 lg:flex-initial flex items-center justify-center lg:justify-start gap-3 px-4 py-3.5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all border-2 text-center lg:text-left cursor-pointer ${
-              activeTab === "settings"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-100 scale-102"
-                : "bg-white text-slate-500 border-slate-200/60 hover:bg-slate-50"
-            }`}
-          >
-            <Settings className="w-4.5 h-4.5" />
-            <span>Settings</span>
-          </button>
+          {/* Points sub-tabs, only while Points is open. */}
+          {route.view === "points" && (
+            <div className="mt-2 pl-3 border-l-2 border-slate-200 flex flex-col gap-1">
+              <DeskSubItem label="Students Grid" active={activeTab === "students"}    onClick={() => setActiveTab("students")} />
+              <DeskSubItem label="Standings"     active={activeTab === "leaderboard"} onClick={() => setActiveTab("leaderboard")} />
+              <DeskSubItem label="Hall of Fame"  active={activeTab === "hall"}        onClick={() => setActiveTab("hall")} />
+            </div>
+          )}
         </div>
 
         {/* Content Viewport */}
         <div className="lg:col-span-3 flex flex-col gap-6">
+          {/* Hub schema not installed yet — say so instead of showing empty lists. */}
+          {hub.schemaMissing && route.view !== "points" && route.view !== "config" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5">
+              <h3 className="font-black text-amber-900 text-sm flex items-center gap-2">
+                <Database className="w-4 h-4" /> Hub tables not installed
+              </h3>
+              <p className="text-xs text-amber-700 font-semibold mt-1.5 leading-relaxed">
+                Run <code className="font-mono bg-amber-100 px-1 rounded">supabase/02_hub.sql</code> in
+                the Supabase SQL editor to switch on Park, Notes, Games, Notices and Attendance.
+              </p>
+            </div>
+          )}
+
+          {/* A back affordance on every sub-screen, for iOS where there is no
+              hardware back button. */}
+          {route.view !== "menu" && (
+            <button
+              onClick={back}
+              className="lg:hidden self-start flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-700 transition-colors cursor-pointer -mb-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          )}
+
+          {route.view === "menu" && (
+            <MasterMenu
+              counts={hub.counts}
+              editorMode={editorMode}
+              onOpen={(view: View) => navigate({ view })}
+            />
+          )}
+
+          {route.view === "attendance" && <AttendanceView studentCount={state.students.length} />}
+
+          {route.view === "notes" && (
+            <ResourceList
+              title="Notes"
+              subtitle="Class notes, searchable"
+              kinds={["note"]}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              emptyHint="Post notes here instead of the WhatsApp group and they stay findable by date and title."
+            />
+          )}
+
+          {route.view === "games" && (
+            <ResourceList
+              title="Games"
+              subtitle="Practice games & quizzes"
+              kinds={["game"]}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              emptyHint="Add game links once; students can find and bookmark them any time."
+            />
+          )}
+
+          {route.view === "notices" && (
+            <ResourceList
+              title="Notices"
+              subtitle="Announcements you shouldn't miss"
+              kinds={["notice"]}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              emptyHint="Tests, holidays, timing changes. Pin the urgent ones to the top."
+            />
+          )}
+
+          {route.view === "homework" && (
+            <ResourceList
+              title="Homework"
+              subtitle="What's due, and when"
+              kinds={["homework"]}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              emptyHint="Each item can carry a due date, so nothing gets missed."
+            />
+          )}
+
+          {route.view === "resources" && (
+            <ResourceList
+              title="Resources"
+              subtitle="Videos, PDFs and links"
+              kinds={["video", "pdf", "link"]}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              emptyHint="Anything worth keeping: YouTube explanations, PDFs, reference links."
+            />
+          )}
+
+          {route.view === "park" && (
+            <Park
+              route={route}
+              boards={hub.boards}
+              subjects={hub.subjects}
+              chapters={hub.chapters}
+              editorMode={editorMode}
+              studentId={studentId}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              onNavigate={(next) => navigate({ view: "park", ...next })}
+              onTreeChanged={hub.refreshTree}
+            />
+          )}
+
+          {route.view === "bookmarks" && (
+            <BookmarksView
+              students={state.students}
+              studentId={studentId}
+              onChooseStudent={chooseStudent}
+              bookmarkedIds={hub.bookmarkedIds}
+              onToggleBookmark={hub.toggleBookmark}
+              editorMode={editorMode}
+            />
+          )}
+
+          {route.view === "summary" && (
+            <SummaryView
+              editorMode={editorMode}
+              onUnlockRequest={() => setIsLoginModalOpen(true)}
+            />
+          )}
+
+          {/* Points sub-tab switcher (mobile). */}
+          {route.view === "points" && (
+            <div className="lg:hidden flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 select-none">
+              {([
+                ["class", "Class"],
+                ["standings", "Standings"],
+                ["hall", "Hall of Fame"]
+              ] as const).map(([tab, label]) => (
+                <button
+                  key={tab}
+                  onClick={() => navigate({ view: "points", tab })}
+                  className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    route.tab === tab ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* STUDENTS TAB */}
           {activeTab === "students" && (
             <div className="space-y-6">
@@ -1639,76 +1888,47 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         onClose={dismissCelebration}
       />
 
-      {/* Sticky Bottom Tab Bar for Mobile (Thumb-reach optimized) */}
+      {/* Sticky bottom bar (mobile). Menu is home; the tools live inside it. */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 py-2.5 px-3 flex items-center justify-around z-30 pb-safe shadow-xl">
-        {/* Tab: Grid */}
-        <button
-          onClick={() => setActiveTab("students")}
-          className={`flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === "students" ? "text-indigo-600 scale-105" : "text-slate-400"
-          }`}
-          style={{ minWidth: "55px", minHeight: "48px" }}
-        >
-          <Users className="w-5.5 h-5.5" />
-          <span className="text-[9px] font-black uppercase tracking-wider">Class</span>
-        </button>
-
-        {/* Tab: Leaderboard */}
-        <button
-          onClick={() => setActiveTab("leaderboard")}
-          className={`flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === "leaderboard" ? "text-indigo-600 scale-105" : "text-slate-400"
-          }`}
-          style={{ minWidth: "55px", minHeight: "48px" }}
-        >
-          <Trophy className="w-5.5 h-5.5" />
-          <span className="text-[9px] font-black uppercase tracking-wider">Standings</span>
-        </button>
-
-        {/* Tab: Hall */}
-        <button
-          onClick={() => setActiveTab("hall")}
-          className={`flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === "hall" ? "text-indigo-600 scale-105" : "text-slate-400"
-          }`}
-          style={{ minWidth: "55px", minHeight: "48px" }}
-        >
-          <Award className="w-5.5 h-5.5" />
-          <span className="text-[9px] font-black uppercase tracking-wider">Hall</span>
-        </button>
-
-        {/* Tab: Lock Toggle */}
-        <button
-          onClick={() => {
-            if (editorMode) {
-              void signOutTeacher();
-            } else {
-              setIsLoginModalOpen(true);
-            }
-          }}
-          className={`flex flex-col items-center justify-center gap-1 transition-all ${
-            editorMode ? "text-amber-500 font-extrabold scale-110" : "text-slate-400"
-          }`}
-          style={{ minWidth: "55px", minHeight: "48px" }}
-        >
-          {editorMode ? <Unlock className="w-5.5 h-5.5" /> : <Lock className="w-5.5 h-5.5" />}
-          {/* The label names the action the tap performs, not the current state. */}
-          <span className="text-[9px] font-black uppercase tracking-wider">
-            {editorMode ? "Lock" : "Unlock"}
-          </span>
-        </button>
-
-        {/* Tab: Settings */}
-        <button
-          onClick={() => setActiveTab("settings")}
-          className={`flex flex-col items-center justify-center gap-1 transition-all ${
-            activeTab === "settings" ? "text-indigo-600 scale-105" : "text-slate-400"
-          }`}
-          style={{ minWidth: "55px", minHeight: "48px" }}
-        >
-          <Settings className="w-5.5 h-5.5" />
-          <span className="text-[9px] font-black uppercase tracking-wider">Config</span>
-        </button>
+        <TabButton
+          icon={LayoutGrid}
+          label="Menu"
+          active={route.view === "menu"}
+          onClick={() => navigate({ view: "menu" })}
+        />
+        <TabButton
+          icon={TreePine}
+          label="Park"
+          active={route.view === "park"}
+          onClick={() => navigate({ view: "park" })}
+        />
+        <TabButton
+          icon={BookmarkIcon}
+          label="Saved"
+          active={route.view === "bookmarks"}
+          onClick={() => navigate({ view: "bookmarks" })}
+        />
+        {editorMode ? (
+          <TabButton
+            icon={Mic}
+            label="Summary"
+            active={route.view === "summary"}
+            onClick={() => navigate({ view: "summary" })}
+          />
+        ) : (
+          <TabButton
+            icon={Trophy}
+            label="Points"
+            active={route.view === "points"}
+            onClick={() => navigate({ view: "points", tab: "class" })}
+          />
+        )}
+        <TabButton
+          icon={editorMode ? Unlock : Lock}
+          label={editorMode ? "Lock" : "Unlock"}
+          active={false}
+          onClick={() => (editorMode ? void signOutTeacher() : setIsLoginModalOpen(true))}
+        />
       </div>
     </div>
   );

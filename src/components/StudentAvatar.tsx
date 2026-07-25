@@ -205,7 +205,7 @@ export const AVATAR_PRESETS: AvatarPreset[] = [
 
 interface StudentAvatarProps {
   presetId: number;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
   animate?: boolean;
 }
@@ -217,8 +217,11 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
 }) => {
   const preset = AVATAR_PRESETS[presetId % AVATAR_PRESETS.length] || AVATAR_PRESETS[0];
 
-  // size mapping
+  // size mapping. `xs` is used by the leaderboard rows and Past Records; it was
+  // missing here, so those avatars were being handed `undefined` as their size
+  // class and rendered with no width or height at all.
   const sizeClasses = {
+    xs: "w-8 h-8 text-[10px]",
     sm: "w-10 h-10 text-xs",
     md: "w-16 h-16 text-sm",
     lg: "w-24 h-24 text-base",
@@ -572,7 +575,6 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
         viewBox="0 0 100 100"
         className="w-full h-full select-none"
         xmlns="http://www.w3.org/2000/svg"
-        referrerPolicy="no-referrer"
       >
         {/* Background Circle */}
         <circle cx="50" cy="50" r="48" fill={preset.bgColor} />
