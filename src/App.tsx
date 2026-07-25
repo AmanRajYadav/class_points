@@ -833,7 +833,13 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             />
           )}
 
-          {route.view === "attendance" && <AttendanceView studentCount={state.students.length} />}
+          {route.view === "attendance" && (
+            <AttendanceView
+              students={state.students}
+              editorMode={editorMode}
+              onUnlockRequest={() => setIsLoginModalOpen(true)}
+            />
+          )}
 
           {route.view === "notes" && (
             <ResourceList

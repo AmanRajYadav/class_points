@@ -109,6 +109,15 @@ const MISSING = new Set(["42P01", "PGRST205", "PGRST106"]);
 const guard = (error: any) => {
   if (!error) return;
   if (MISSING.has(error.code)) throw new HubSchemaMissingError();
+
+  // 42501 is an RLS refusal, which for this app means exactly one thing: the
+  // teacher session is gone. Reaching it mid-task is plausible — a token
+  // refresh can fail after the screen has already been unlocked — and the raw
+  // Postgres wording explains nothing to the person holding the phone.
+  if (error.code === "42501") {
+    throw new Error("Your teacher session has expired. Unlock again to save this.");
+  }
+
   throw new Error(error.message ?? String(error));
 };
 
@@ -249,6 +258,24 @@ export async function markAttendance(
     date,
     status,
   });
+  guard(error);
+}
+
+/** One round trip for "everyone present", rather than one per student. */
+export async function markAttendanceBulk(
+  studentIds: string[],
+  date: string,
+  status: AttendanceStatus
+): Promise<void> {
+  if (studentIds.length === 0) return;
+  const { error } = await supabase.from("attendance").upsert(
+    studentIds.map((studentId) => ({
+      id: `${studentId}_${date}`,
+      student_id: studentId,
+      date,
+      status,
+    }))
+  );
   guard(error);
 }
 
