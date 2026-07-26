@@ -10,6 +10,7 @@ import {
   Paperclip,
   Pencil,
   Trophy,
+  Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { View } from "../lib/useRoute";
@@ -72,6 +73,13 @@ const TILES: Tile[] = [
     hint: "True or false, one swipe each",
     icon: Brain,
     tint: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
+  },
+  {
+    view: "leaderboard",
+    label: "Leaderboard",
+    hint: "XP, levels and this week's ranking",
+    icon: Zap,
+    tint: "bg-amber-50 text-amber-600 border-amber-100",
   },
   {
     view: "activity",

@@ -20,6 +20,7 @@ export type View =
   | "homework"
   | "park"
   | "swipemaths"
+  | "leaderboard"
   | "bookmarks"
   | "summary"
   | "activity"
@@ -49,6 +50,7 @@ const VIEWS = new Set<string>([
   "homework",
   "park",
   "swipemaths",
+  "leaderboard",
   "bookmarks",
   "summary",
   "activity",

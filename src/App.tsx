@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Database,
   Activity,
+  User,
   ArrowLeft,
   LayoutGrid,
   TreePine,
@@ -51,12 +52,14 @@ import {
   isAppStateShaped
 } from "./lib/storage";
 import { useAppState, SyncStatus } from "./lib/useAppState";
-import { changeTeacherPassword, signOutTeacher, useTeacherSession } from "./lib/auth";
+import { changeOwnPassword, signOut, useSession } from "./lib/auth";
 import { useRoute, View } from "./lib/useRoute";
 import { useHub } from "./lib/useHub";
-import { useStudentIdentity } from "./lib/identity";
+import { useVisitLog } from "./lib/useVisitLog";
 import { StudentAvatar, AVATAR_PRESETS } from "./components/StudentAvatar";
-import { TeacherLoginModal } from "./components/TeacherLoginModal";
+import { LoginModal } from "./components/LoginModal";
+import { Leaderboard } from "./components/Leaderboard";
+import { StudentAccounts } from "./components/StudentAccounts";
 import { StudentDetailModal } from "./components/StudentDetailModal";
 import { QuickMark } from "./components/QuickMark";
 import { TrophyAnimationModal } from "./components/TrophyAnimationModal";
@@ -258,15 +261,17 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // --- Teacher session ---
   // `editorMode` only decides which controls are drawn. Row level security is
   // what actually rejects writes from anyone who is not signed in.
-  const { isTeacher } = useTeacherSession();
+  // Signing in is not authority: `isTeacher` comes from a profile row only the
+  // teacher can create, and every write policy re-checks it in the database.
+  const { isTeacher, studentId, profile } = useSession();
   const editorMode = isTeacher;
 
   // --- Navigation ---
   // The URL hash is the single source of truth for where we are, so Android's
   // back button walks back through the app instead of closing it.
   const { route, navigate, back } = useRoute();
-  const { studentId, choose: chooseStudent } = useStudentIdentity();
   const hub = useHub(studentId);
+  useVisitLog(studentId);
 
   // The four original screens still key off `activeTab`; it is now derived from
   // the route rather than held in state. Anything outside Points/Config leaves
@@ -296,7 +301,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<"All" | "Mangla" | "Sarkanda">("All");
 
   // --- Modals & Overlays ---
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [loginTab, setLoginTab] = useState<"student" | "teacher" | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isQuickMarkOpen, setIsQuickMarkOpen] = useState<boolean>(false);
   const [showAddStudent, setShowAddStudent] = useState<boolean>(false);
@@ -480,7 +485,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // Change the teacher password (Supabase Auth, not app data)
   const handleSavePassword = async () => {
     if (newPassword.length < 6) return;
-    const failure = await changeTeacherPassword(newPassword);
+    const failure = await changeOwnPassword(newPassword);
     setPasswordMessage(
       failure
         ? { ok: false, text: failure }
@@ -733,19 +738,31 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                 <Unlock className="w-4 h-4" />
                 <span>EDITOR ON</span>
                 <button
-                  onClick={() => void signOutTeacher()}
+                  onClick={() => void signOut()}
                   className="ml-2 bg-slate-950 text-white hover:bg-slate-800 px-2 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider transition-all cursor-pointer"
                 >
                   LOCK
                 </button>
               </motion.div>
+            ) : profile ? (
+              /* Signed in as a student: show who, and a way out. */
+              <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-black text-xs px-3 py-2 rounded-xl">
+                <User className="w-4 h-4" />
+                <span className="max-w-[9ch] truncate">@{profile.username}</span>
+                <button
+                  onClick={() => void signOut()}
+                  className="ml-1.5 text-[10px] uppercase font-black tracking-wider text-indigo-400 hover:text-indigo-700 transition-colors cursor-pointer"
+                >
+                  Out
+                </button>
+              </div>
             ) : (
               <button
-                onClick={() => setIsLoginModalOpen(true)}
+                onClick={() => setLoginTab("student")}
                 className="flex items-center gap-1.5 bg-slate-800 text-slate-100 hover:bg-slate-900 font-black text-xs px-3 py-2 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer border border-slate-700"
               >
                 <Lock className="w-4 h-4 text-slate-400" />
-                <span>TEACHER UNLOCK</span>
+                <span>SIGN IN</span>
               </button>
             )}
           </div>
@@ -843,7 +860,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             <AttendanceView
               students={state.students}
               editorMode={editorMode}
-              onUnlockRequest={() => setIsLoginModalOpen(true)}
+              onUnlockRequest={() => setLoginTab("teacher")}
             />
           )}
 
@@ -943,27 +960,29 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
           {route.view === "bookmarks" && (
             <BookmarksView
-              students={state.students}
               studentId={studentId}
-              onChooseStudent={chooseStudent}
+              username={profile?.username ?? null}
+              onSignIn={() => setLoginTab("student")}
               bookmarkedIds={hub.bookmarkedIds}
               onToggleBookmark={hub.toggleBookmark}
               editorMode={editorMode}
             />
           )}
 
+          {route.view === "leaderboard" && <Leaderboard studentId={studentId} />}
+
           {route.view === "activity" && (
             <ActivityView
               students={state.students}
               editorMode={editorMode}
-              onUnlockRequest={() => setIsLoginModalOpen(true)}
+              onUnlockRequest={() => setLoginTab("teacher")}
             />
           )}
 
           {route.view === "summary" && (
             <SummaryView
               editorMode={editorMode}
-              onUnlockRequest={() => setIsLoginModalOpen(true)}
+              onUnlockRequest={() => setLoginTab("teacher")}
             />
           )}
 
@@ -1499,7 +1518,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                       Please unlock Editor Mode using the button in the top header to configure settings.
                     </p>
                     <button
-                      onClick={() => setIsLoginModalOpen(true)}
+                      onClick={() => setLoginTab("teacher")}
                       className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer"
                     >
                       Unlock Now
@@ -1630,10 +1649,18 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                       </div>
                     </div>
 
+                    {/* Student accounts */}
+                    <div className="border-b border-slate-100 pb-5 space-y-3">
+                      <h4 className="text-sm font-black text-slate-700 uppercase tracking-wider">
+                        3. Student Accounts
+                      </h4>
+                      <StudentAccounts students={state.students} />
+                    </div>
+
                     {/* Data Backups */}
                     <div className="border-b border-slate-100 pb-5 space-y-3">
                       <h4 className="text-sm font-black text-slate-700 uppercase tracking-wider">
-                        3. Backup, Export, & Import
+                        4. Backup, Export, & Import
                       </h4>
                       <p className="text-xs text-slate-400">
                         Export your students, daily records, settings, and history logs as a backup file, or import a previously exported backup file to restore records.
@@ -1728,7 +1755,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                     {/* Danger zone Reset */}
                     <div className="space-y-3">
                       <h4 className="text-sm font-black text-red-600 uppercase tracking-wider">
-                        4. Danger Zone
+                        5. Danger Zone
                       </h4>
                       <p className="text-xs text-slate-400">
                         Irreversibly erase all students, daily points records, settings, and trophy histories to start the coaching class from scratch.
@@ -1874,10 +1901,11 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
       {/* --- REUSABLE COMPONENT MODALS --- */}
 
-      {/* Teacher sign-in */}
-      <TeacherLoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+      {/* Sign-in, student or teacher */}
+      <LoginModal
+        isOpen={loginTab !== null}
+        initialTab={loginTab ?? "student"}
+        onClose={() => setLoginTab(null)}
       />
 
       {/* Student detail card modal */}
@@ -1893,7 +1921,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         onDeleteStudent={handleDeleteStudent}
         cycleStartDate={state.settings.cycleStartDate}
         cycleEndDate={state.settings.cycleEndDate}
-        onUnlockRequest={() => setIsLoginModalOpen(true)}
+        onUnlockRequest={() => setLoginTab("teacher")}
       />
 
       {/* Quick mark class overlay */}
@@ -1951,7 +1979,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           icon={editorMode ? Unlock : Lock}
           label={editorMode ? "Lock" : "Unlock"}
           active={false}
-          onClick={() => (editorMode ? void signOutTeacher() : setIsLoginModalOpen(true))}
+          onClick={() => (editorMode ? void signOut() : setLoginTab("teacher"))}
         />
       </div>
     </div>
