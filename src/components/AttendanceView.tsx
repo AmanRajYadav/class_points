@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarCheck,
   Check,
   CheckCheck,
+  Clock,
   Loader2,
   Lock,
   RotateCcw,
@@ -11,7 +12,7 @@ import {
   UserRoundX,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { AttendanceStatus, Branch, Student } from "../types";
 import { fetchAttendance, markAttendance, markAttendanceBulk } from "../lib/hub";
 import { formatDateString, parseDateOnly } from "../lib/storage";
@@ -20,8 +21,11 @@ import { AttendanceHistory } from "./AttendanceHistory";
 
 const BRANCHES: Branch[] = ["Mangla", "Sarkanda"];
 
-/** How far a card must travel before the swipe counts. */
+/** How far a card must travel before a slow drag counts. */
 const COMMIT_PX = 90;
+
+/** Minimum travel for a fast flick to count, so a twitch cannot commit. */
+const FLICK_MIN_PX = 45;
 
 interface Props {
   students: Student[];
@@ -70,6 +74,7 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
 
   const present = roster.filter((s) => marks?.[s.id] === "present").length;
   const absent = roster.filter((s) => marks?.[s.id] === "absent").length;
+  const late = roster.filter((s) => marks?.[s.id] === "late").length;
 
   const apply = async (student: Student, status: AttendanceStatus) => {
     // Optimistic: the card must leave immediately or the deck feels broken.
@@ -204,11 +209,14 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
         </div>
 
         {/* Tally */}
-        <div className={`items-center gap-2 text-[11px] font-black uppercase tracking-wider ${mode === "today" ? "flex" : "hidden"}`}>
-          <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+        <div className={`items-center gap-1.5 flex-wrap text-[11px] font-black uppercase tracking-wider ${mode === "today" ? "flex" : "hidden"}`}>
+          <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-xl border border-emerald-100 whitespace-nowrap">
             <UserRoundCheck className="w-3.5 h-3.5" /> {present} present
           </span>
-          <span className="flex items-center gap-1.5 bg-rose-50 text-rose-700 px-2.5 py-1.5 rounded-xl border border-rose-100">
+          <span className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1.5 rounded-xl border border-amber-100 whitespace-nowrap">
+            <Clock className="w-3.5 h-3.5" /> {late} late
+          </span>
+          <span className="flex items-center gap-1.5 bg-rose-50 text-rose-700 px-2.5 py-1.5 rounded-xl border border-rose-100 whitespace-nowrap">
             <UserRoundX className="w-3.5 h-3.5" /> {absent} absent
           </span>
           {pending.length > 0 && (
@@ -253,17 +261,21 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
               <div className="absolute inset-x-4 top-3 bottom-0 bg-white rounded-3xl border border-slate-200/70 scale-95 opacity-60" />
             )}
 
-            <AnimatePresence mode="popLayout">
-              <SwipeCard
-                key={current.id}
-                student={current}
-                onCommit={(status) => void apply(current, status)}
-              />
-            </AnimatePresence>
+            {/* No AnimatePresence: the card animates itself off-screen and only
+                then reports the result, so there is no exit to orchestrate —
+                and popLayout's layout projection was extra work per frame for
+                an absolutely positioned card that never reflows. */}
+            <SwipeCard
+              key={current.id}
+              student={current}
+              onCommit={(status) => void apply(current, status)}
+            />
           </div>
 
-          {/* Buttons, for anyone who would rather tap than swipe. */}
-          <div className="flex items-center justify-center gap-4">
+          {/* Buttons alongside the gestures. Late gets one because an upward
+              swipe is the least discoverable of the three, and because tapping
+              is easier than swiping when you are holding a phone one-handed. */}
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => void apply(current, "absent")}
               aria-label="Mark absent"
@@ -273,12 +285,11 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
             </button>
 
             <button
-              onClick={undo}
-              disabled={undoStack.length === 0}
-              aria-label="Undo"
-              className="w-12 h-12 rounded-full bg-slate-100 hover:bg-slate-200 disabled:opacity-30 text-slate-500 flex items-center justify-center transition-all active:scale-90 cursor-pointer"
+              onClick={() => void apply(current, "late")}
+              aria-label="Mark late"
+              className="w-14 h-14 rounded-full bg-white border-2 border-amber-200 text-amber-500 hover:bg-amber-50 shadow-sm flex items-center justify-center transition-all active:scale-90 cursor-pointer"
             >
-              <Undo2 className="w-5 h-5" />
+              <Clock className="w-6 h-6" strokeWidth={2.5} />
             </button>
 
             <button
@@ -289,6 +300,14 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
               <Check className="w-7 h-7" strokeWidth={3} />
             </button>
           </div>
+
+          <button
+            onClick={undo}
+            disabled={undoStack.length === 0}
+            className="mx-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none py-2 px-3 transition-colors cursor-pointer"
+          >
+            <Undo2 className="w-3.5 h-3.5" /> Undo last
+          </button>
         </>
       )}
 
@@ -302,7 +321,7 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
             {branch} register done
           </h3>
           <p className="text-xs font-bold text-emerald-700 mt-0.5">
-            {present} present · {absent} absent
+            {present} present · {late} late · {absent} absent
           </p>
         </div>
       )}
@@ -326,7 +345,12 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
                 <button
                   key={student.id}
                   onClick={() =>
-                    void apply(student, status === "present" ? "absent" : "present")
+                    // Cycles present -> late -> absent -> present, so every
+                    // state is reachable by tapping.
+                    void apply(
+                      student,
+                      status === "present" ? "late" : status === "late" ? "absent" : "present"
+                    )
                   }
                   className="w-full flex items-center gap-3 p-2 rounded-2xl hover:bg-slate-50 transition-all cursor-pointer text-left"
                 >
@@ -338,9 +362,11 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
                     className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg border ${
                       status === "present"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                        : status === "absent"
-                          ? "bg-rose-50 text-rose-700 border-rose-100"
-                          : "bg-slate-50 text-slate-400 border-slate-200"
+                        : status === "late"
+                          ? "bg-amber-50 text-amber-700 border-amber-100"
+                          : status === "absent"
+                            ? "bg-rose-50 text-rose-700 border-rose-100"
+                            : "bg-slate-50 text-slate-400 border-slate-200"
                     }`}
                   >
                     {status ?? "not marked"}
@@ -364,7 +390,25 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
   );
 };
 
-/** One draggable card. Left commits absent, right commits present. */
+
+/**
+ * One draggable card: left absent, right present, up late.
+ *
+ * The card is animated imperatively rather than through `animate` props or
+ * `dragSnapToOrigin`. Two reasons, both learned from the first version feeling
+ * slightly wrong:
+ *
+ *  - On commit the card must leave in the direction it was thrown. Snapping it
+ *    back to centre and cross-fading it out reads as the app fighting the
+ *    gesture, which is what "not quite smooth" actually was.
+ *  - Driving the motion values directly avoids a spring-back and a fly-out
+ *    being scheduled against the same value at once.
+ *
+ * Only `transform` and `opacity` animate. The previous version interpolated
+ * `backgroundColor` on every frame, which cannot be composited and forces a
+ * repaint of the whole card sixty times a second — the tinting is now two
+ * overlay layers whose opacity is driven off the drag position instead.
+ */
 function SwipeCard({
   student,
   onCommit,
@@ -373,33 +417,86 @@ function SwipeCard({
   onCommit: (status: AttendanceStatus) => void;
 }) {
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-14, 14]);
-  const presentOpacity = useTransform(x, [20, 110], [0, 1]);
-  const absentOpacity = useTransform(x, [-110, -20], [1, 0]);
-  const tint = useTransform(
-    x,
-    [-140, 0, 140],
-    ["rgb(255 241 242)", "rgb(255 255 255)", "rgb(236 253 245)"]
-  );
+  const y = useMotionValue(0);
+  const leaving = useRef(false);
+
+  const rotate = useTransform(x, [-240, 240], [-15, 15]);
+  const presentOpacity = useTransform(x, [25, 110], [0, 1]);
+  const absentOpacity = useTransform(x, [-110, -25], [1, 0]);
+  const lateOpacity = useTransform(y, [-110, -25], [1, 0]);
+
+  // Tint layers, so colour never touches the paint path.
+  const presentTint = useTransform(x, [0, 160], [0, 0.5]);
+  const absentTint = useTransform(x, [-160, 0], [0.5, 0]);
+
+  const spring = { type: "spring" as const, stiffness: 500, damping: 38, restDelta: 0.5 };
+
+  const settle = () => {
+    animate(x, 0, spring);
+    animate(y, 0, spring);
+  };
+
+  const fly = (status: AttendanceStatus) => {
+    if (leaving.current) return;
+    leaving.current = true;
+
+    const throwX = status === "present" ? 1.4 : status === "absent" ? -1.4 : 0;
+    const ease = [0.2, 0.6, 0.35, 1] as const;
+
+    animate(x, throwX * window.innerWidth, { duration: 0.26, ease });
+    animate(y, status === "late" ? -window.innerHeight : 60, {
+      duration: 0.26,
+      ease,
+      // Hand over only once the card is gone, so the next one does not appear
+      // underneath this one mid-flight.
+      onComplete: () => onCommit(status),
+    });
+  };
 
   return (
     <motion.div
-      drag="x"
-      dragSnapToOrigin
-      dragElastic={0.5}
-      style={{ x, rotate, backgroundColor: tint }}
+      drag
+      dragMomentum={false}
+      dragElastic={0.8}
+      // Both axes are needed for the up-swipe, so the browser must not claim
+      // vertical movement for scrolling while the finger is on the card.
+      // Everything outside the deck still scrolls normally.
+      style={{ x, y, rotate, touchAction: "none", willChange: "transform" }}
       onDragEnd={(_, info) => {
-        // Velocity as well as distance: a quick flick should count even if the
-        // finger never travelled far.
-        const flung = Math.abs(info.velocity.x) > 500;
-        if (info.offset.x > COMMIT_PX || (flung && info.velocity.x > 0)) onCommit("present");
-        else if (info.offset.x < -COMMIT_PX || (flung && info.velocity.x < 0)) onCommit("absent");
+        const { offset, velocity } = info;
+
+        // A flick counts without travelling the full distance, but it still has
+        // to travel *something*: velocity alone would let an accidental twitch
+        // on a stationary finger mark a student absent.
+        const far = (d: number) => Math.abs(d) > COMMIT_PX;
+        const flicked = (d: number, v: number) => Math.abs(v) > 600 && Math.abs(d) > FLICK_MIN_PX;
+
+        const vertical = Math.abs(offset.y) > Math.abs(offset.x);
+
+        if (vertical && offset.y < 0 && (far(offset.y) || flicked(offset.y, velocity.y))) {
+          fly("late");
+        } else if (offset.x > 0 && (far(offset.x) || flicked(offset.x, velocity.x))) {
+          fly("present");
+        } else if (offset.x < 0 && (far(offset.x) || flicked(offset.x, velocity.x))) {
+          fly("absent");
+        } else {
+          settle();
+        }
       }}
-      initial={{ scale: 0.96, opacity: 0 }}
+      initial={{ scale: 0.97, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-      className="absolute inset-0 rounded-3xl border-2 border-slate-200 shadow-lg flex flex-col items-center justify-center cursor-grab active:cursor-grabbing touch-pan-y"
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="absolute inset-0 rounded-3xl bg-white border-2 border-slate-200 shadow-lg flex flex-col items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden"
     >
+      <motion.div
+        style={{ opacity: presentTint }}
+        className="absolute inset-0 bg-emerald-100 pointer-events-none"
+      />
+      <motion.div
+        style={{ opacity: absentTint }}
+        className="absolute inset-0 bg-rose-100 pointer-events-none"
+      />
+
       {/* Verdict stamps */}
       <motion.div
         style={{ opacity: presentOpacity }}
@@ -413,6 +510,12 @@ function SwipeCard({
       >
         Absent
       </motion.div>
+      <motion.div
+        style={{ opacity: lateOpacity }}
+        className="absolute bottom-14 left-1/2 -translate-x-1/2 border-4 border-amber-500 text-amber-500 font-black text-xl uppercase tracking-wider px-3 py-1 rounded-xl pointer-events-none"
+      >
+        Late
+      </motion.div>
 
       <div className="p-1.5 rounded-full bg-gradient-to-tr from-emerald-400 via-indigo-500 to-purple-600 shadow-lg">
         <StudentAvatar presetId={student.avatarId} size="lg" />
@@ -424,8 +527,9 @@ function SwipeCard({
         {student.branch} Branch
       </span>
 
-      <div className="absolute bottom-5 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300 pointer-events-none">
+      <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300 pointer-events-none">
         <span>← Absent</span>
+        <span className="text-amber-300">↑ Late</span>
         <span>Present →</span>
       </div>
     </motion.div>

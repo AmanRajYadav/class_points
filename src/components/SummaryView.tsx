@@ -20,7 +20,7 @@ import {
   uploadAudio,
 } from "../lib/hub";
 import { formatDateString, parseDateOnly } from "../lib/storage";
-import { speechSupported, useVoiceNote } from "../lib/useVoiceNote";
+import { transcriptionAvailable, useVoiceNote } from "../lib/useVoiceNote";
 
 const mmss = (total: number) =>
   `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -43,7 +43,7 @@ export const SummaryView: React.FC<Props> = ({ editorMode, onUnlockRequest }) =>
   const [playing, setPlaying] = useState<string | null>(null);
 
   const voice = useVoiceNote();
-  const canTranscribe = speechSupported();
+  const canTranscribe = transcriptionAvailable();
 
   const load = useCallback(() => {
     fetchSummaries()
@@ -151,8 +151,9 @@ export const SummaryView: React.FC<Props> = ({ editorMode, onUnlockRequest }) =>
 
         {!canTranscribe && (
           <p className="mt-3 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 leading-relaxed">
-            This browser can't transcribe live. The audio will still be recorded and
-            saved — you can type or auto-transcribe it later.
+            This device can't transcribe live, so the audio is recorded and saved on
+            its own — tap the text afterwards to type it up, or leave it for an
+            automatic pass later.
           </p>
         )}
 
@@ -176,15 +177,29 @@ export const SummaryView: React.FC<Props> = ({ editorMode, onUnlockRequest }) =>
                 <X className="w-5 h-5" />
               </button>
 
-              <motion.button
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ repeat: Infinity, duration: 1.6 }}
-                onClick={() => void handleStop()}
-                className="w-20 h-20 rounded-full bg-slate-900 text-white shadow-lg flex items-center justify-center cursor-pointer"
-                aria-label="Stop and save"
-              >
-                <Square className="w-7 h-7 fill-white" />
-              </motion.button>
+              {/* The pulse is a sibling, not the button itself. An element under
+                  a permanently running transform can miss taps in iOS Safari,
+                  and this button must never be the thing that fails. */}
+              <div className="relative w-20 h-20">
+                <motion.span
+                  animate={{ scale: [1, 1.12, 1], opacity: [0.45, 0, 0.45] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                  className="absolute inset-0 rounded-full bg-rose-400 pointer-events-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleStop()}
+                  disabled={saving}
+                  className="absolute inset-0 rounded-full bg-slate-900 text-white shadow-lg flex items-center justify-center cursor-pointer active:scale-95 transition-transform disabled:opacity-60"
+                  aria-label="Stop and save"
+                >
+                  {saving ? (
+                    <Loader2 className="w-7 h-7 animate-spin" />
+                  ) : (
+                    <Square className="w-7 h-7 fill-white" />
+                  )}
+                </button>
+              </div>
 
               <span className="w-12 text-center font-black font-mono text-slate-700">
                 {mmss(voice.seconds)}
