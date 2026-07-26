@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Activity,
   Brain,
   CalendarCheck,
   ChevronRight,
@@ -73,6 +74,14 @@ const TILES: Tile[] = [
     tint: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
   },
   {
+    view: "activity",
+    label: "Activity",
+    hint: "Who's opening it, who's practising",
+    icon: Activity,
+    tint: "bg-slate-100 text-slate-600 border-slate-200",
+    teacherOnly: true,
+  },
+  {
     view: "resources",
     label: "Resources",
     hint: "Videos, PDFs and links",
@@ -117,7 +126,7 @@ export const MasterMenu: React.FC<Props> = ({ counts, editorMode, onOpen }) => (
     </div>
 
     <div className="grid grid-cols-2 gap-3">
-      {TILES.map((tile, index) => {
+      {TILES.filter((t) => !t.teacherOnly || editorMode).map((tile, index) => {
         const Icon = tile.icon;
         const count = countFor(tile.view, counts);
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { recordVisit } from "./hub";
 
 /**
  * "Who is using this phone?"
@@ -30,6 +31,32 @@ export function useStudentIdentity() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  // Daily heartbeat. Once per calendar day per device rather than on every
+  // render or route change: the question the teacher is asking is "did they
+  // open it today", and a request per navigation would answer that no better
+  // while making the visit count meaningless.
+  useEffect(() => {
+    if (!studentId) return;
+
+    const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
+    const marker = `fluence_visit_marked_${studentId}`;
+    let already: string | null = null;
+    try {
+      already = localStorage.getItem(marker);
+    } catch {
+      /* private mode: the beat just repeats */
+    }
+    if (already === today) return;
+
+    void recordVisit(studentId).then(() => {
+      try {
+        localStorage.setItem(marker, today);
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [studentId]);
 
   const choose = useCallback((id: string | null) => {
     try {

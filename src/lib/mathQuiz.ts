@@ -966,9 +966,25 @@ export function generateRound(level: Level, count: number, allowed?: TopicId[]):
   return out;
 }
 
-/** Seconds allowed per question. Legend is deliberately tight. */
+/** Seconds allowed per question in Survival. Legend is deliberately tight. */
 export const secondsFor = (level: Level): number =>
   level === "easy" ? 15 : level === "medium" ? 20 : level === "hard" ? 25 : 20;
+
+export type Mode = "practice" | "survival";
+
+/** Lives in Survival. Three is enough to survive a misread, not a gap. */
+export const SURVIVAL_LIVES = 3;
+
+export const MODE_META: Record<Mode, { label: string; blurb: string }> = {
+  practice: {
+    label: "Practice",
+    blurb: "No timer, no lives — think it through",
+  },
+  survival: {
+    label: "Survival",
+    blurb: "Timer and 3 lives — how far can you get?",
+  },
+};
 
 export const LEVEL_META: Record<Level, { label: string; blurb: string; accent: string }> = {
   easy: { label: "Easy", blurb: "Tables, basic operations, simple fractions", accent: "emerald" },

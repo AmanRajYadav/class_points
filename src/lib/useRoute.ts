@@ -22,6 +22,7 @@ export type View =
   | "swipemaths"
   | "bookmarks"
   | "summary"
+  | "activity"
   | "config";
 
 export type PointsTab = "class" | "standings" | "hall";
@@ -50,6 +51,7 @@ const VIEWS = new Set<string>([
   "swipemaths",
   "bookmarks",
   "summary",
+  "activity",
   "config",
 ]);
 

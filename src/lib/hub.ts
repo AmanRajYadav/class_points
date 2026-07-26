@@ -367,6 +367,109 @@ export async function signedAudioUrl(path: string): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
+// Activity
+//
+// Both writes go through security-definer functions, so a student's anonymous
+// session needs no table privileges. Neither can be read back without the
+// teacher session.
+// ---------------------------------------------------------------------------
+
+/** Fire-and-forget: a failed heartbeat must never interrupt anything. */
+export async function recordVisit(studentId: string): Promise<void> {
+  try {
+    await supabase.rpc("record_visit", { p_student_id: studentId });
+  } catch {
+    /* ignore */
+  }
+}
+
+export interface GameSessionInput {
+  studentId: string | null;
+  mode: "practice" | "survival";
+  level: string;
+  topics: string[];
+  score: number;
+  total: number;
+  bestStreak: number;
+  durationSeconds: number;
+}
+
+export async function recordGameSession(input: GameSessionInput): Promise<void> {
+  try {
+    await supabase.rpc("record_game_session", {
+      p_student_id: input.studentId,
+      p_game: "swipe_maths",
+      p_mode: input.mode,
+      p_level: input.level,
+      p_topics: input.topics,
+      p_score: input.score,
+      p_total: input.total,
+      p_best_streak: input.bestStreak,
+      p_duration_seconds: input.durationSeconds,
+    });
+  } catch {
+    /* a lost session record is not worth showing an error over */
+  }
+}
+
+export interface ActivityDay {
+  studentId: string;
+  date: string;
+  visits: number;
+  lastSeen: string;
+}
+
+export interface GameSessionRow {
+  id: string;
+  studentId: string | null;
+  mode: string | null;
+  level: string | null;
+  topics: string[] | null;
+  score: number;
+  total: number;
+  bestStreak: number;
+  durationSeconds: number | null;
+  finishedAt: string;
+}
+
+export async function fetchActivity(from: string, to: string): Promise<ActivityDay[]> {
+  const { data, error } = await supabase
+    .from("student_activity")
+    .select("student_id,date,visits,last_seen")
+    .gte("date", from)
+    .lte("date", to);
+  guard(error);
+  return ((data ?? []) as any[]).map((r) => ({
+    studentId: r.student_id,
+    date: r.date,
+    visits: r.visits,
+    lastSeen: r.last_seen,
+  }));
+}
+
+export async function fetchGameSessions(from: string, limit = 300): Promise<GameSessionRow[]> {
+  const { data, error } = await supabase
+    .from("game_sessions")
+    .select("*")
+    .gte("finished_at", from)
+    .order("finished_at", { ascending: false })
+    .limit(limit);
+  guard(error);
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id,
+    studentId: r.student_id,
+    mode: r.mode,
+    level: r.level,
+    topics: r.topics,
+    score: r.score,
+    total: r.total,
+    bestStreak: r.best_streak,
+    durationSeconds: r.duration_seconds,
+    finishedAt: r.finished_at,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // Bookmarks
 // ---------------------------------------------------------------------------
 

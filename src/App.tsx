@@ -26,6 +26,7 @@ import {
   Loader2,
   RefreshCw,
   Database,
+  Activity,
   ArrowLeft,
   LayoutGrid,
   TreePine,
@@ -67,6 +68,7 @@ import { BookmarksView } from "./components/BookmarksView";
 import { SummaryView } from "./components/SummaryView";
 import { AttendanceView } from "./components/AttendanceView";
 import { SwipeMaths } from "./components/SwipeMaths";
+import { ActivityView } from "./components/ActivityView";
 
 type AppController = ReturnType<typeof useAppState>;
 
@@ -786,7 +788,10 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           <DeskNavItem icon={TreePine}   label="Park"       active={route.view === "park"}       onClick={() => navigate({ view: "park" })} />
           <DeskNavItem icon={BookmarkIcon} label="Saved"    active={route.view === "bookmarks"}  onClick={() => navigate({ view: "bookmarks" })} />
           {editorMode && (
-            <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
+            <>
+              <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
+              <DeskNavItem icon={Activity} label="Activity" active={route.view === "activity"} onClick={() => navigate({ view: "activity" })} />
+            </>
           )}
           <DeskNavItem icon={Settings}   label="Settings"   active={route.view === "config"}     onClick={() => setActiveTab("settings")} />
 
@@ -918,7 +923,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           )}
 
           {route.view === "swipemaths" && (
-            <SwipeMaths onExit={() => navigate({ view: "menu" })} />
+            <SwipeMaths onExit={() => navigate({ view: "menu" })} studentId={studentId} />
           )}
 
           {route.view === "park" && (
@@ -944,6 +949,14 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               bookmarkedIds={hub.bookmarkedIds}
               onToggleBookmark={hub.toggleBookmark}
               editorMode={editorMode}
+            />
+          )}
+
+          {route.view === "activity" && (
+            <ActivityView
+              students={state.students}
+              editorMode={editorMode}
+              onUnlockRequest={() => setIsLoginModalOpen(true)}
             />
           )}
 
