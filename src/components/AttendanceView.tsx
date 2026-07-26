@@ -16,6 +16,7 @@ import { AttendanceStatus, Branch, Student } from "../types";
 import { fetchAttendance, markAttendance, markAttendanceBulk } from "../lib/hub";
 import { formatDateString, parseDateOnly } from "../lib/storage";
 import { StudentAvatar } from "./StudentAvatar";
+import { AttendanceHistory } from "./AttendanceHistory";
 
 const BRANCHES: Branch[] = ["Mangla", "Sarkanda"];
 
@@ -30,6 +31,7 @@ interface Props {
 
 export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlockRequest }) => {
   const [branch, setBranch] = useState<Branch>("Mangla");
+  const [mode, setMode] = useState<"today" | "history">("today");
   const [date, setDate] = useState<string>(() => formatDateString(new Date()));
   const [marks, setMarks] = useState<Record<string, AttendanceStatus> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -154,19 +156,37 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-black text-slate-900 leading-tight">Attendance</h2>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-              {parseDateOnly(date).toLocaleDateString(undefined, {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
+              {mode === "today"
+                ? parseDateOnly(date).toLocaleDateString(undefined, {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  })
+                : "Record so far"}
             </p>
           </div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-          />
+          {mode === "today" && (
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          )}
+        </div>
+
+        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 select-none">
+          {(["today", "history"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`flex-1 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                mode === m ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              {m === "today" ? "Take register" : "History"}
+            </button>
+          ))}
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 select-none">
@@ -184,7 +204,7 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
         </div>
 
         {/* Tally */}
-        <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider">
+        <div className={`items-center gap-2 text-[11px] font-black uppercase tracking-wider ${mode === "today" ? "flex" : "hidden"}`}>
           <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1.5 rounded-xl border border-emerald-100">
             <UserRoundCheck className="w-3.5 h-3.5" /> {present} present
           </span>
@@ -197,20 +217,22 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
         </div>
       </div>
 
-      {error && (
+      {mode === "history" && <AttendanceHistory roster={roster} branch={branch} />}
+
+      {mode === "today" && error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-3.5 text-xs font-bold text-red-700">
           {error}
         </div>
       )}
 
-      {!marks && (
+      {mode === "today" && !marks && (
         <div className="flex justify-center py-12">
           <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
         </div>
       )}
 
       {/* The deck */}
-      {marks && current && (
+      {mode === "today" && marks && current && (
         <>
           <button
             onClick={() => void markAllPresent()}
@@ -271,7 +293,7 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
       )}
 
       {/* Done */}
-      {marks && !current && roster.length > 0 && (
+      {mode === "today" && marks && !current && roster.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 text-center">
           <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center mx-auto">
             <Check className="w-6 h-6" strokeWidth={3} />
@@ -285,14 +307,14 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
         </div>
       )}
 
-      {marks && roster.length === 0 && (
+      {mode === "today" && marks && roster.length === 0 && (
         <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-10 text-center">
           <p className="text-sm font-extrabold text-slate-600">No students in {branch}.</p>
         </div>
       )}
 
       {/* Everyone's state, always visible and always correctable. */}
-      {marks && roster.length > 0 && (
+      {mode === "today" && marks && roster.length > 0 && (
         <div className="bg-white rounded-3xl border border-slate-200/60 p-4 sm:p-5">
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
             Tap anyone to change
