@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Brain,
   CalendarCheck,
   ChevronRight,
   Gamepad2,
@@ -63,6 +64,13 @@ const TILES: Tile[] = [
     hint: "Practice games & quizzes",
     icon: Gamepad2,
     tint: "bg-violet-50 text-violet-600 border-violet-100",
+  },
+  {
+    view: "swipemaths",
+    label: "Swipe Maths",
+    hint: "True or false, one swipe each",
+    icon: Brain,
+    tint: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
   },
   {
     view: "resources",

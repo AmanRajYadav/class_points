@@ -12,3 +12,10 @@ coverage/
 
 # Machine-specific Claude Code permissions
 .claude/settings.local.json
+
+# Agent skills. The vendored copy under .agents/ and the symlinks under
+# .claude/skills/ are both reproducible from skills-lock.json via
+# `npx skills add supabase/agent-skills` — and the symlinks hold absolute
+# paths, so committing them would break on any other machine.
+.agents/
+.claude/skills/

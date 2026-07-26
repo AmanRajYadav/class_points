@@ -66,6 +66,7 @@ import { Park } from "./components/Park";
 import { BookmarksView } from "./components/BookmarksView";
 import { SummaryView } from "./components/SummaryView";
 import { AttendanceView } from "./components/AttendanceView";
+import { SwipeMaths } from "./components/SwipeMaths";
 
 type AppController = ReturnType<typeof useAppState>;
 
@@ -914,6 +915,10 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               chapters={hub.chapters}
               emptyHint="Anything worth keeping: YouTube explanations, PDFs, reference links."
             />
+          )}
+
+          {route.view === "swipemaths" && (
+            <SwipeMaths onExit={() => navigate({ view: "menu" })} />
           )}
 
           {route.view === "park" && (

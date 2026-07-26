@@ -247,6 +247,35 @@ export async function fetchAttendance(from: string, to: string): Promise<Attenda
   return (data ?? []).map(toAttendance);
 }
 
+/** One day's punctuality signal for one student, read from the points table. */
+export interface PunctualityRow {
+  studentId: string;
+  date: string;
+  onTime: number;
+}
+
+/**
+ * On-time points over a range.
+ *
+ * A student marked present whose row here has `on_time = 0` arrived late — the
+ * two tables already record the same fact, so the register can report lateness
+ * without it being entered twice. The row has to exist: a day with no points
+ * entered at all means unknown, not late.
+ */
+export async function fetchPunctuality(from: string, to: string): Promise<PunctualityRow[]> {
+  const { data, error } = await supabase
+    .from("daily_points")
+    .select("student_id,date,on_time")
+    .gte("date", from)
+    .lte("date", to);
+  guard(error);
+  return ((data ?? []) as { student_id: string; date: string; on_time: number }[]).map((r) => ({
+    studentId: r.student_id,
+    date: r.date,
+    onTime: r.on_time,
+  }));
+}
+
 export async function markAttendance(
   studentId: string,
   date: string,
