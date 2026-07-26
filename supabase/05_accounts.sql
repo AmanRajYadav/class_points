@@ -78,20 +78,41 @@ grant execute on function public.current_student_id() to anon, authenticated;
 -- ---------------------------------------------------------------------------
 -- 3. PROMOTE THE EXISTING TEACHER
 --
--- The account created before roles existed becomes the teacher. Without this
--- the next statement would lock everyone out of writing anything.
+-- The account created before roles existed becomes the teacher. This has to
+-- succeed before the next section runs: section 4 rewrites every policy to
+-- demand is_teacher(), so reaching it with no teacher profile would lock the
+-- owner out of their own database with no route back except the SQL editor.
 -- ---------------------------------------------------------------------------
 
+-- The configured address first.
 insert into public.profiles (id, username, role)
-select u.id, coalesce(split_part(u.email, '@', 1), 'teacher'), 'teacher'
+select u.id, coalesce(nullif(split_part(u.email, '@', 1), ''), 'teacher'), 'teacher'
 from auth.users u
 where u.email = 'teacher@classpoints.app'
 on conflict (id) do update set role = 'teacher';
 
+-- Failing that, a project with exactly one account has an unambiguous owner —
+-- which covers anyone who signed up under a different address than the README
+-- suggested. Two or more accounts is genuinely ambiguous, so it is left alone
+-- and the check below stops the migration.
+do $$
+begin
+  if not exists (select 1 from public.profiles where role = 'teacher')
+     and (select count(*) from auth.users) = 1 then
+    insert into public.profiles (id, username, role)
+    select u.id, coalesce(nullif(split_part(u.email, '@', 1), ''), 'teacher'), 'teacher'
+    from auth.users u
+    on conflict (id) do update set role = 'teacher';
+  end if;
+end $$;
+
+-- Abort rather than warn. A warning does not stop execution, so the previous
+-- version of this file would have carried on and locked the account out.
 do $$
 begin
   if not exists (select 1 from public.profiles where role = 'teacher') then
-    raise warning 'No teacher profile exists. Sign in once as the teacher, then re-run this file, or nobody will be able to write.';
+    raise exception
+      'No teacher profile could be created, so this migration has been rolled back rather than locking you out. Sign in to the app once as the teacher, then run this file again. If your teacher account uses an address other than teacher@classpoints.app, insert its profile manually first: insert into public.profiles (id, username, role) select id, ''teacher'', ''teacher'' from auth.users where email = ''<your address>'';';
   end if;
 end $$;
 
@@ -223,6 +244,13 @@ $$;
 
 alter table public.game_sessions add column if not exists xp integer not null default 0;
 create index if not exists game_sessions_xp_idx on public.game_sessions (finished_at desc, xp);
+
+-- Dropped, not replaced. 04_activity.sql declared this `returns void`; it now
+-- returns the XP it awarded, and Postgres refuses to change a return type
+-- through `create or replace`. Without this line the migration halts here.
+drop function if exists public.record_game_session(
+  text, text, text, text, text[], integer, integer, integer, integer
+);
 
 create or replace function public.record_game_session(
   p_student_id       text,
