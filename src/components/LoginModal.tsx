@@ -1,26 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, GraduationCap, Loader2, Lock, Unlock, User, X } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Unlock, X } from "lucide-react";
 import { motion } from "motion/react";
-import {
-  clearFailedLogins,
-  lockoutRemaining,
-  noteFailedLogin,
-  signInStudent,
-  signInTeacher,
-} from "../lib/auth";
-
-type Tab = "student" | "teacher";
+import { clearFailedLogins, lockoutRemaining, noteFailedLogin, signIn } from "../lib/auth";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  /** Which tab opens first — the lock button wants teacher, the rest student. */
-  initialTab?: Tab;
 }
 
-export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "student" }) => {
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const [username, setUsername] = useState("");
+/**
+ * One form for everybody.
+ *
+ * There were separate student and teacher tabs, which existed only because the
+ * teacher's email was a build-time constant and had to be supplied for them.
+ * It is not any more: the role comes off the profile once the session exists,
+ * so a username and an address go through the same field.
+ */
+export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,17 +27,16 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
 
   useEffect(() => {
     if (!isOpen) {
-      setUsername("");
+      setIdentifier("");
       setPassword("");
       setError(null);
       setShow(false);
       setBusy(false);
       return;
     }
-    setTab(initialTab);
     setWaitFor(lockoutRemaining());
     setTimeout(() => inputRef.current?.focus(), 150);
-  }, [isOpen, initialTab]);
+  }, [isOpen]);
 
   // Countdown while locked out.
   useEffect(() => {
@@ -57,14 +53,12 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
 
     setError(null);
     setBusy(true);
-    const message =
-      tab === "teacher" ? await signInTeacher(password) : await signInStudent(username, password);
+    const message = await signIn(identifier, password);
     setBusy(false);
 
     if (message) {
       setError(message);
-      const delay = noteFailedLogin();
-      setWaitFor(delay);
+      setWaitFor(noteFailedLogin());
       if (navigator.vibrate) navigator.vibrate(100);
       return;
     }
@@ -91,61 +85,32 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/60 select-none mt-6 mb-5">
-          {(["student", "teacher"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => {
-                setTab(t);
-                setError(null);
-              }}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                tab === t ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
-              }`}
-            >
-              {t === "student" ? <User className="w-3.5 h-3.5" /> : <GraduationCap className="w-3.5 h-3.5" />}
-              {t}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-col items-center">
-          <div
-            className={`p-3 rounded-full mb-3 ${
-              tab === "teacher" ? "bg-amber-100 text-amber-500" : "bg-indigo-100 text-indigo-500"
-            }`}
-          >
+        <div className="flex flex-col items-center mt-5">
+          <div className="p-3 rounded-full mb-3 bg-indigo-100 text-indigo-500">
             <Lock className="w-7 h-7" />
           </div>
-          <h3 className="text-xl font-black text-slate-800">
-            {tab === "teacher" ? "Teacher sign in" : "Sign in to play"}
-          </h3>
+          <h3 className="text-xl font-black text-slate-800">Sign in</h3>
           <p className="text-xs text-slate-400 text-center mt-1 px-2">
-            {tab === "teacher"
-              ? "Unlocks marking, editing and the class activity."
-              : "Your XP, streak and place on the leaderboard follow your account."}
+            Your XP, streak and saved items follow your account.
           </p>
 
           <form onSubmit={submit} className="w-full mt-5 space-y-3">
-            {tab === "student" && (
-              <input
-                ref={tab === "student" ? inputRef : undefined}
-                type="text"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="Username"
-                value={username}
-                onChange={(e) => {
-                  setError(null);
-                  setUsername(e.target.value);
-                }}
-                disabled={busy || waitFor > 0}
-                className={field}
-                required
-              />
-            )}
+            <input
+              ref={inputRef}
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Username or email"
+              value={identifier}
+              onChange={(e) => {
+                setError(null);
+                setIdentifier(e.target.value);
+              }}
+              disabled={busy || waitFor > 0}
+              className={field}
+              required
+            />
 
             <motion.div
               animate={error ? { x: [-8, 8, -8, 8, 0] } : {}}
@@ -153,7 +118,6 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
               className="relative"
             >
               <input
-                ref={tab === "teacher" ? inputRef : undefined}
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="Password"
@@ -187,12 +151,8 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
 
             <button
               type="submit"
-              disabled={busy || waitFor > 0 || password.length === 0}
-              className={`w-full py-3 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 ${
-                tab === "teacher"
-                  ? "bg-slate-800 hover:bg-slate-900"
-                  : "bg-indigo-600 hover:bg-indigo-700"
-              }`}
+              disabled={busy || waitFor > 0 || password.length === 0 || identifier.length === 0}
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               {busy ? (
                 <>
@@ -207,9 +167,8 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose, initialTab = "stu
           </form>
 
           <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
-            {tab === "student"
-              ? "No account? Ask your teacher — accounts are created for you."
-              : "What you can edit is enforced by the database, not this screen."}
+            Students: your teacher creates your account. What anyone can edit is
+            enforced by the database, not this screen.
           </p>
         </div>
       </motion.div>

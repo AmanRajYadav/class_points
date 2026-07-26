@@ -138,6 +138,15 @@ access. If you would rather close that off entirely, turn sign-ups off and
 create users under **Authentication → Users** instead, then link each one in
 Settings.
 
+## Signing in
+
+One form, one field: a username or an email address. Students type the username
+you gave them; you type whatever address your own account uses. The role comes
+off the profile after the session exists, so there is no teacher-specific
+address configured anywhere — an earlier version hardcoded one, and any project
+whose owner had signed up under a different address got "that password is not
+right" forever, indistinguishable from a genuinely wrong password.
+
 ## Creating accounts
 
 **Settings → Student Accounts**, with editor mode unlocked. Pick a student,

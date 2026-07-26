@@ -15,14 +15,6 @@ const url = configured(import.meta.env.VITE_SUPABASE_URL);
 const anonKey = configured(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 /**
- * The single teacher account. Only the password is ever typed — the unlock
- * screen keeps the one-field feel of the old PIN box while the check happens
- * in Supabase Auth rather than in the browser.
- */
-export const TEACHER_EMAIL =
-  configured(import.meta.env.VITE_TEACHER_EMAIL) ?? "teacher@classpoints.app";
-
-/**
  * True when the app was built with Supabase credentials. When false the UI
  * shows a setup screen instead of silently falling back to browser-only
  * storage — silent fallback is exactly what made data look "saved" when it

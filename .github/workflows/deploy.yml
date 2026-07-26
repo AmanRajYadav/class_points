@@ -58,7 +58,6 @@ jobs:
           # either way, and row level security is what protects the data.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_TEACHER_EMAIL: ${{ vars.VITE_TEACHER_EMAIL }}
           # Serve from https://<user>.github.io/<repo>/
           BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build

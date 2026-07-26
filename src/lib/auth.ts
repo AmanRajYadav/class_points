@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createClient, Session } from "@supabase/supabase-js";
-import { supabase, TEACHER_EMAIL } from "./supabase";
+import { supabase } from "./supabase";
 
 /**
  * Accounts.
@@ -108,19 +108,25 @@ const friendly = (message: string): string => {
   return message;
 };
 
-export async function signInTeacher(password: string): Promise<string | null> {
-  const { error } = await supabase.auth.signInWithPassword({
-    email: TEACHER_EMAIL,
-    password,
-  });
-  return error ? friendly(error.message) : null;
-}
+/**
+ * One sign-in for everybody.
+ *
+ * There is no separate teacher door, because there is no longer anything to
+ * distinguish at this point: whether you are the teacher is a role on your
+ * profile, read after the session exists. An address is passed through as
+ * typed; anything else is treated as a student username and expanded to its
+ * internal address.
+ *
+ * The teacher's address used to be a build-time constant, which meant a
+ * project whose owner signed up under any other address got "that password is
+ * not right" forever, with no way to tell it apart from a genuinely wrong
+ * password. Nothing is hardcoded now.
+ */
+export async function signIn(identifier: string, password: string): Promise<string | null> {
+  const id = identifier.trim();
+  const email = id.includes("@") ? id.toLowerCase() : usernameToEmail(id);
 
-export async function signInStudent(username: string, password: string): Promise<string | null> {
-  const { error } = await supabase.auth.signInWithPassword({
-    email: usernameToEmail(username),
-    password,
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
   return error ? friendly(error.message) : null;
 }
 

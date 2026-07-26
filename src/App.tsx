@@ -301,7 +301,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<"All" | "Mangla" | "Sarkanda">("All");
 
   // --- Modals & Overlays ---
-  const [loginTab, setLoginTab] = useState<"student" | "teacher" | null>(null);
+  const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isQuickMarkOpen, setIsQuickMarkOpen] = useState<boolean>(false);
   const [showAddStudent, setShowAddStudent] = useState<boolean>(false);
@@ -758,7 +758,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               </div>
             ) : (
               <button
-                onClick={() => setLoginTab("student")}
+                onClick={() => setIsLoginOpen(true)}
                 className="flex items-center gap-1.5 bg-slate-800 text-slate-100 hover:bg-slate-900 font-black text-xs px-3 py-2 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer border border-slate-700"
               >
                 <Lock className="w-4 h-4 text-slate-400" />
@@ -860,7 +860,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             <AttendanceView
               students={state.students}
               editorMode={editorMode}
-              onUnlockRequest={() => setLoginTab("teacher")}
+              onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
 
@@ -962,7 +962,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             <BookmarksView
               studentId={studentId}
               username={profile?.username ?? null}
-              onSignIn={() => setLoginTab("student")}
+              onSignIn={() => setIsLoginOpen(true)}
               bookmarkedIds={hub.bookmarkedIds}
               onToggleBookmark={hub.toggleBookmark}
               editorMode={editorMode}
@@ -975,14 +975,14 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             <ActivityView
               students={state.students}
               editorMode={editorMode}
-              onUnlockRequest={() => setLoginTab("teacher")}
+              onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
 
           {route.view === "summary" && (
             <SummaryView
               editorMode={editorMode}
-              onUnlockRequest={() => setLoginTab("teacher")}
+              onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
 
@@ -1518,7 +1518,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                       Please unlock Editor Mode using the button in the top header to configure settings.
                     </p>
                     <button
-                      onClick={() => setLoginTab("teacher")}
+                      onClick={() => setIsLoginOpen(true)}
                       className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer"
                     >
                       Unlock Now
@@ -1902,11 +1902,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
       {/* --- REUSABLE COMPONENT MODALS --- */}
 
       {/* Sign-in, student or teacher */}
-      <LoginModal
-        isOpen={loginTab !== null}
-        initialTab={loginTab ?? "student"}
-        onClose={() => setLoginTab(null)}
-      />
+      <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} />
 
       {/* Student detail card modal */}
       <StudentDetailModal
@@ -1921,7 +1917,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         onDeleteStudent={handleDeleteStudent}
         cycleStartDate={state.settings.cycleStartDate}
         cycleEndDate={state.settings.cycleEndDate}
-        onUnlockRequest={() => setLoginTab("teacher")}
+        onUnlockRequest={() => setIsLoginOpen(true)}
       />
 
       {/* Quick mark class overlay */}
@@ -1979,7 +1975,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           icon={editorMode ? Unlock : Lock}
           label={editorMode ? "Lock" : "Unlock"}
           active={false}
-          onClick={() => (editorMode ? void signOut() : setLoginTab("teacher"))}
+          onClick={() => (editorMode ? void signOut() : setIsLoginOpen(true))}
         />
       </div>
     </div>
