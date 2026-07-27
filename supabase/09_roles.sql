@@ -29,6 +29,11 @@
 -- 1. ALLOW THE NEW ROLES
 -- ---------------------------------------------------------------------------
 
+-- Drop-then-add rather than the usual "if not exists in pg_constraint" dance.
+-- That pattern is for adding a constraint that may already be there; this one
+-- is *changing* an existing constraint from two roles to four, so a guard that
+-- skips when the name exists would leave the old two-role check in place and
+-- every insert below would fail. Re-running this pair is still idempotent.
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
   check (role in ('student', 'teacher', 'editor', 'admin'));
@@ -133,10 +138,21 @@ $$;
 -- predicate that no longer describes what a teacher may do.
 drop function if exists public.can_mark_points();
 
-grant execute on function public.is_admin()   to anon, authenticated;
-grant execute on function public.can_manage() to anon, authenticated;
-grant execute on function public.can_teach()  to anon, authenticated;
-grant execute on function public.is_teacher() to anon, authenticated;
+-- Postgres grants EXECUTE to PUBLIC on every new function, which makes a
+-- security definer function in a public schema a callable API by default. That
+-- is harmless for these four — each answers "what am I?" about the caller and
+-- returns false to a stranger — but the grant should still be named rather
+-- than inherited, so a later function added beside them does not get one by
+-- accident.
+revoke execute on function public.is_admin()   from public;
+revoke execute on function public.can_manage() from public;
+revoke execute on function public.can_teach()  from public;
+revoke execute on function public.is_teacher() from public;
+
+grant execute on function public.is_admin()   to anon, authenticated, service_role;
+grant execute on function public.can_manage() to anon, authenticated, service_role;
+grant execute on function public.can_teach()  to anon, authenticated, service_role;
+grant execute on function public.is_teacher() to anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- 4. RE-CUT THE POLICIES
@@ -333,7 +349,54 @@ exception when insufficient_privilege then
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 5. CHECKS
+-- 5. TABLE GRANTS — A DEADLINE, NOT A PREFERENCE
+--
+-- Supabase is removing automatic exposure of public tables to the Data API.
+-- New projects have worked this way since 2026-05-30; it is enforced on every
+-- remaining project on **2026-10-30**. This project predates the change and is
+-- currently running on the old implicit grants, which means that on that date
+-- every read in the app starts returning a permission error at once — the
+-- board, the library, the register, all of it.
+--
+-- Granting explicitly now costs nothing and is not a loosening: RLS is what
+-- decides who may do what, and a grant without a matching policy still returns
+-- nothing. This only restores, by name, the access the platform is about to
+-- stop assuming.
+--
+-- Least privilege is kept: anon may read the public surface and write nothing
+-- at all, anywhere.
+-- ---------------------------------------------------------------------------
+
+grant usage on schema public to anon, authenticated;
+
+-- Public to read: the board, the library, the register.
+grant select on
+  public.students, public.daily_points, public.trophy_winners, public.app_settings,
+  public.boards, public.subjects, public.chapters, public.resources, public.attendance
+to anon, authenticated;
+
+-- Signed-in only, and then still filtered by policy: the teaching log, the
+-- activity tables, bookmarks, and the account list.
+grant select on
+  public.class_summaries, public.student_activity, public.game_sessions,
+  public.student_bookmarks, public.profiles
+to authenticated;
+
+-- Writes are granted to `authenticated` as a whole and narrowed by policy —
+-- that is the Supabase model, and it is why every table above has RLS on.
+-- Section 6 verifies that none of them slipped through with it off.
+grant insert, update, delete on
+  public.students, public.daily_points, public.trophy_winners, public.app_settings,
+  public.boards, public.subjects, public.chapters, public.resources, public.attendance,
+  public.class_summaries, public.student_activity, public.game_sessions,
+  public.student_bookmarks, public.profiles
+to authenticated;
+
+-- No sequence grants: every primary key here is a text key or a
+-- gen_random_uuid() default, so there is no sequence to advance.
+
+-- ---------------------------------------------------------------------------
+-- 6. CHECKS
 -- ---------------------------------------------------------------------------
 
 -- Who holds what. Expect exactly one admin.
@@ -362,3 +425,26 @@ from pg_policy
 where coalesce(pg_get_expr(polqual, polrelid), '') like '%is_teacher%'
    or coalesce(pg_get_expr(polwithcheck, polrelid), '') like '%is_teacher%'
 order by 1, 2;
+
+-- Section 5 just granted write access to `authenticated` on fourteen tables.
+-- Every one of them must have RLS on, or that grant is the only thing standing
+-- between a student's login and the roster. Expect no rows.
+select c.relname as table_without_rls
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relkind = 'r'
+  and not c.relrowsecurity
+order by 1;
+
+-- And every one of them must actually have policies — RLS on with no policy
+-- denies everything, which would take the app down just as thoroughly as no
+-- RLS would expose it. Expect no rows.
+select c.relname as table_with_rls_but_no_policies
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relkind = 'r'
+  and c.relrowsecurity
+  and not exists (select 1 from pg_policy p where p.polrelid = c.oid)
+order by 1;

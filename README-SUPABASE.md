@@ -175,6 +175,24 @@ Only an admin can write to `profiles` at all, which is the hinge the whole model
 turns on: every other permission is a row in that table, so anyone who could
 write there could grant themselves anything.
 
+## A deadline baked into 09: Data API grants
+
+Supabase is removing automatic exposure of public tables to the Data API. New
+projects have worked this way since **2026-05-30**; it is enforced on every
+remaining project on **2026-10-30**. This project predates the change and has
+been running on implicit grants — so on that date every read in the app would
+start returning a permission error at once.
+
+`09_roles.sql` grants the same access explicitly, by name. It is not a
+loosening: RLS decides who may do what, and a grant with no matching policy
+still returns nothing. `anon` gets `SELECT` on the public surface and no write
+anywhere; `authenticated` gets writes that the policies then narrow.
+
+The script's last two checks exist because of those grants: every public table
+must have RLS **on** (or the grant is the only thing between a student's login
+and the roster) and must have **at least one policy** (RLS on with no policy
+denies everything, which takes the app down just as thoroughly).
+
 ## Two Supabase settings you must change
 
 **Authentication → Sign In / Providers → Email:**
