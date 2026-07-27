@@ -67,7 +67,7 @@ create or replace function public.record_visit(p_student_id text)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_today date;
@@ -106,7 +106,7 @@ create or replace function public.record_game_session(
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_student text;

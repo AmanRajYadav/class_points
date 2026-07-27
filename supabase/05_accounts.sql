@@ -53,7 +53,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = ''
 as $$
   select exists (
     select 1 from public.profiles
@@ -67,7 +67,7 @@ returns text
 language sql
 stable
 security definer
-set search_path = public
+set search_path = ''
 as $$
   select student_id from public.profiles where id = auth.uid();
 $$;
@@ -210,7 +210,7 @@ create or replace function public.record_visit(p_student_id text)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_student text;
@@ -266,7 +266,7 @@ create or replace function public.record_game_session(
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   v_student text;
@@ -332,7 +332,7 @@ returns table (
 language sql
 stable
 security definer
-set search_path = public
+set search_path = ''
 as $$
   select
     s.id,

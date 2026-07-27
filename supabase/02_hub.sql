@@ -8,13 +8,14 @@
 -- Safe to re-run.
 -- ============================================================================
 
--- Trigram search for the "searchable" requirement. Optional: if the extension
--- is unavailable the schema still works, ILIKE just scans instead.
+-- pg_trgm is enabled ready for the search indexes described further down; it
+-- costs nothing while unused. Wrapped because a restricted project may refuse
+-- the extension, and that must not stop the rest of the schema installing.
 do $$
 begin
   create extension if not exists pg_trgm;
 exception when others then
-  raise notice 'pg_trgm unavailable (%); search will fall back to a scan.', sqlerrm;
+  raise notice 'pg_trgm unavailable (%).', sqlerrm;
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -92,13 +93,18 @@ create index if not exists resources_subject_idx on public.resources (subject_id
 create index if not exists resources_due_idx     on public.resources (due_date) where due_date is not null;
 create index if not exists resources_pinned_idx  on public.resources (pinned) where pinned;
 
-do $$
-begin
-  create index if not exists resources_search_idx
-    on public.resources using gin ((title || ' ' || coalesce(description, '')) gin_trgm_ops);
-exception when others then
-  raise notice 'Skipping trigram index (%).', sqlerrm;
-end $$;
+-- No search index, deliberately.
+--
+-- An earlier version indexed the expression (title || ' ' || description) with
+-- trigrams. Nothing could use it: the client filters the columns separately, and
+-- an expression index only serves a query filtering on that same expression. It
+-- charged GIN maintenance on every write and returned nothing.
+--
+-- Search is also done in memory today — both callers of fetchResources omit the
+-- search argument — which is the right call for a few hundred items. Once the
+-- library passes roughly two thousand, wire the search argument through and add
+-- either per-column trigram indexes or a stored tsvector. 08_cleanup.sql spells
+-- out both.
 
 -- ---------------------------------------------------------------------------
 -- 3. ATTENDANCE

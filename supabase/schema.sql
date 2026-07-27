@@ -103,7 +103,7 @@ create or replace function public.close_due_cycles()
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   s            public.app_settings%rowtype;
