@@ -1,6 +1,6 @@
 // Bump this string on every deploy that changes the app shell. Changing it
 // makes `activate` drop every older cache.
-const CACHE_NAME = "fluence-cache-v5";
+const CACHE_NAME = "fluence-cache-v6";
 
 // Everything below is resolved against the worker's own location, never the
 // domain root. On GitHub Pages the app is served from /<repo>/, so hardcoded
@@ -49,7 +49,21 @@ const isImmutableAsset = (url) =>
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const response = await fetch(request);
+    // `cache: "no-cache"` forces a revalidation against the server rather than
+    // letting the browser's own HTTP cache answer.
+    //
+    // Without it "network first" was a half-truth. GitHub Pages serves
+    // index.html with `Cache-Control: max-age=600`, so for ten minutes after a
+    // deploy the browser could satisfy this fetch from its own cache without
+    // touching the network — returning HTML that names the previous bundle
+    // hash. That bundle is under assets/, which is cache-first and immutable,
+    // so it loaded happily from cache too. The result was a fully cached old
+    // app on a good connection, with nothing in the SW to blame: every deploy
+    // had a ten-minute window where a reload changed nothing.
+    //
+    // This still revalidates rather than re-downloads: an unchanged file comes
+    // back 304 on its ETag and costs one round trip.
+    const response = await fetch(request, { cache: "no-cache" });
     if (response && response.status === 200 && response.type === "basic") {
       cache.put(request, response.clone());
     }
