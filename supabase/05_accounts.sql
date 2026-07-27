@@ -143,13 +143,13 @@ begin
       'create policy %I on public.%I for select to anon, authenticated using (true)',
       t || '_read', t);
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (public.is_teacher())',
+      'create policy %I on public.%I for insert to authenticated with check ((select public.is_teacher()))',
       t || '_insert', t);
     execute format(
-      'create policy %I on public.%I for update to authenticated using (public.is_teacher()) with check (public.is_teacher())',
+      'create policy %I on public.%I for update to authenticated using ((select public.is_teacher())) with check ((select public.is_teacher()))',
       t || '_update', t);
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (public.is_teacher())',
+      'create policy %I on public.%I for delete to authenticated using ((select public.is_teacher()))',
       t || '_delete', t);
   end loop;
 end $$;
@@ -157,16 +157,16 @@ end $$;
 -- The teaching log stays teacher-only in both directions.
 drop policy if exists class_summaries_all on public.class_summaries;
 create policy class_summaries_all on public.class_summaries
-  for all to authenticated using (public.is_teacher()) with check (public.is_teacher());
+  for all to authenticated using ((select public.is_teacher())) with check ((select public.is_teacher()));
 
 -- Activity and sessions: teacher reads, nobody else.
 drop policy if exists student_activity_teacher on public.student_activity;
 create policy student_activity_teacher on public.student_activity
-  for all to authenticated using (public.is_teacher()) with check (public.is_teacher());
+  for all to authenticated using ((select public.is_teacher())) with check ((select public.is_teacher()));
 
 drop policy if exists game_sessions_teacher on public.game_sessions;
 create policy game_sessions_teacher on public.game_sessions
-  for all to authenticated using (public.is_teacher()) with check (public.is_teacher());
+  for all to authenticated using ((select public.is_teacher())) with check ((select public.is_teacher()));
 
 -- Bookmarks belong to their owner. Previously anyone could add or remove one
 -- under any name, which was tolerable when nobody could prove who they were;
@@ -177,13 +177,13 @@ drop policy if exists student_bookmarks_delete on public.student_bookmarks;
 
 create policy student_bookmarks_read on public.student_bookmarks
   for select to authenticated
-  using (public.is_teacher() or student_id = public.current_student_id());
+  using ((select public.is_teacher()) or student_id = (select public.current_student_id()));
 create policy student_bookmarks_insert on public.student_bookmarks
   for insert to authenticated
-  with check (public.is_teacher() or student_id = public.current_student_id());
+  with check ((select public.is_teacher()) or student_id = (select public.current_student_id()));
 create policy student_bookmarks_delete on public.student_bookmarks
   for delete to authenticated
-  using (public.is_teacher() or student_id = public.current_student_id());
+  using ((select public.is_teacher()) or student_id = (select public.current_student_id()));
 
 -- Profiles: you can read your own; the teacher reads and writes all. Students
 -- cannot change their own row, or they could promote themselves to teacher.
@@ -193,9 +193,9 @@ drop policy if exists profiles_self_read on public.profiles;
 drop policy if exists profiles_teacher_all on public.profiles;
 
 create policy profiles_self_read on public.profiles
-  for select to authenticated using (id = auth.uid() or public.is_teacher());
+  for select to authenticated using (id = (select auth.uid()) or (select public.is_teacher()));
 create policy profiles_teacher_all on public.profiles
-  for all to authenticated using (public.is_teacher()) with check (public.is_teacher());
+  for all to authenticated using ((select public.is_teacher())) with check ((select public.is_teacher()));
 
 -- ---------------------------------------------------------------------------
 -- 5. TRUSTWORTHY ATTRIBUTION
