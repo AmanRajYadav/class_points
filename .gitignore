@@ -19,3 +19,7 @@ coverage/
 # paths, so committing them would break on any other machine.
 .agents/
 .claude/skills/
+
+# Generated credential scripts. These contain plaintext student passwords and
+# the repository is public — the file is meant to live on your machine only.
+supabase/*_logins.sql
