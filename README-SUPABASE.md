@@ -132,7 +132,19 @@ into four. Addresses carry the role, so an account says what it is on its face:
 | — | no login | Read the board. |
 
 None of these domains can receive mail. That is the point: no inbox to
-compromise, and no confirmation link to chase.
+compromise, and no confirmation link to chase. **It also means password
+recovery can never work** — "Send password recovery" in the dashboard fails
+with *"Email address is invalid"* for every one of these accounts, by design.
+Change a password from Settings → Profile in the app, or in the SQL editor:
+
+```sql
+update auth.users
+set encrypted_password = extensions.crypt('new-password', extensions.gen_salt('bf')),
+    updated_at = now()
+where email = 'aman@admin.fluence.local';
+```
+
+Nobody types these addresses to sign in — see **Signing in** below.
 
 ## Why a teacher gets homework but not notes
 
@@ -204,9 +216,15 @@ denies everything, which takes the app down just as thoroughly).
 
 ## Signing in
 
-One form, one field: a username or an email address. Students type just the
-username you gave them — anything without an `@` gets the students domain. Staff
-type their address in full, since the domain is what says which role they hold.
+One form, one field: everybody types their username, students and staff alike.
+
+That needed `11_username_login.sql`. Giving each role its own domain was right
+for the database and wrong for the login box — a bare username only ever
+resolved to the students domain, so the head typing `aman` got "that username or
+password is not right", indistinguishable from a wrong password. Usernames are
+globally unique, so `email_for_username()` resolves the name to its address
+server-side. An address typed in full still passes through untouched.
+
 The role itself comes off the profile after the session exists, so there is no
 staff-specific address configured anywhere — an earlier version hardcoded one, and any project
 whose owner had signed up under a different address got "that password is not

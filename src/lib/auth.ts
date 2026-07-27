@@ -166,9 +166,17 @@ const friendly = (message: string): string => {
  *
  * There is no separate staff door, because there is nothing to distinguish at
  * this point: your role is a row on your profile, read after the session
- * exists. An address is passed through as typed — which is how staff sign in,
- * since their domain is what says which role they hold. Anything without an @
- * is a student username and gets the students domain.
+ * exists.
+ *
+ * Everybody types their name. Splitting the roles onto their own domains was
+ * right for the database and wrong here — it meant a bare username only ever
+ * resolved to the students domain, so the head typing "aman" got "that
+ * username or password is not right", which is indistinguishable from a wrong
+ * password. Usernames are globally unique, so the database resolves the name
+ * to its address; the students domain is only a fallback for when that call
+ * cannot be made.
+ *
+ * An address typed in full is still passed through untouched.
  *
  * The teacher's address used to be a build-time constant, which meant a
  * project whose owner signed up under any other address got "that password is
@@ -177,10 +185,29 @@ const friendly = (message: string): string => {
  */
 export async function signIn(identifier: string, password: string): Promise<string | null> {
   const id = identifier.trim();
-  const email = id.includes("@") ? id.toLowerCase() : usernameToEmail(id);
+  const email = id.includes("@") ? id.toLowerCase() : await resolveUsername(id);
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   return error ? friendly(error.message) : null;
+}
+
+/**
+ * Username to internal address.
+ *
+ * Falls back to the students domain rather than failing, for two reasons: it is
+ * where eleven of the thirteen accounts live, and a project that has not run
+ * 11_username_login.sql yet still signs students in exactly as before.
+ */
+async function resolveUsername(username: string): Promise<string> {
+  try {
+    const { data, error } = await supabase.rpc("email_for_username", {
+      p_username: normaliseUsername(username),
+    });
+    if (!error && typeof data === "string" && data.includes("@")) return data.toLowerCase();
+  } catch {
+    /* offline, or the function is not installed — fall through */
+  }
+  return usernameToEmail(username);
 }
 
 export async function signOut(): Promise<void> {

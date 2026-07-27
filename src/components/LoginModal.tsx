@@ -101,7 +101,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
-              placeholder="Username or email"
+              placeholder="Username"
               value={identifier}
               onChange={(e) => {
                 setError(null);
@@ -167,8 +167,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </form>
 
           <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
-            Students sign in with just their username. Staff use their full address —
-            the domain is what says which role you hold. What anyone can edit is
+            Just your username — students and staff alike. What anyone can edit is
             enforced by the database, not this screen.
           </p>
         </div>
