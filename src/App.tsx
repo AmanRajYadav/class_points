@@ -60,6 +60,7 @@ import { StudentAvatar, AVATAR_PRESETS } from "./components/StudentAvatar";
 import { LoginModal } from "./components/LoginModal";
 import { Leaderboard } from "./components/Leaderboard";
 import { StudentAccounts } from "./components/StudentAccounts";
+import { ProfileCard } from "./components/ProfileCard";
 import { StudentDetailModal } from "./components/StudentDetailModal";
 import { QuickMark } from "./components/QuickMark";
 import { TrophyAnimationModal } from "./components/TrophyAnimationModal";
@@ -1496,6 +1497,13 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {/* SETTINGS TAB */}
           {activeTab === "settings" && (
             <div className="space-y-6">
+              {/* Anyone signed in sees their own profile; the teacher panel
+                  below stays locked to the teacher. */}
+              <ProfileCard
+                profile={profile}
+                students={state.students}
+                onSignIn={() => setIsLoginOpen(true)}
+              />
               {/* Teacher settings panel (Unlock check) */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
                 <div className="flex items-center gap-3">

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Trash2, UserPlus } from "lucide-react";
+import { Check, ExternalLink, Link2, Loader2, Trash2 } from "lucide-react";
 import { Student } from "../types";
 import {
-  createStudentAccount,
   fetchStudentAccounts,
+  linkStudentAccount,
   normaliseUsername,
   revokeStudentAccount,
   StudentAccount,
+  usernameToEmail,
 } from "../lib/auth";
 import { StudentAvatar } from "./StudentAvatar";
 
@@ -14,14 +15,15 @@ interface Props {
   students: Student[];
 }
 
-/** Suggests a username from a name, so the teacher rarely has to think of one. */
+const DASHBOARD_USERS = "https://supabase.com/dashboard/project/wccuyukbmagzkculpzyh/auth/users";
+
 const suggest = (name: string) => normaliseUsername(name).slice(0, 20);
 
 export const StudentAccounts = ({ students }: Props) => {
   const [accounts, setAccounts] = useState<StudentAccount[] | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [uid, setUid] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -31,16 +33,13 @@ export const StudentAccounts = ({ students }: Props) => {
 
   useEffect(load, [load]);
 
-  const withoutAccounts = students.filter(
-    (s) => !accounts?.some((a) => a.studentId === s.id)
-  );
+  const withoutAccounts = students.filter((s) => !accounts?.some((a) => a.studentId === s.id));
 
-  const create = async () => {
-    if (!selected || !username.trim() || password.length < 6) return;
+  const link = async () => {
     setBusy(true);
     setMessage(null);
 
-    const { error } = await createStudentAccount(username, password, selected);
+    const { error } = await linkStudentAccount(uid, username, selected);
     setBusy(false);
 
     if (error) {
@@ -49,16 +48,10 @@ export const StudentAccounts = ({ students }: Props) => {
     }
 
     const who = students.find((s) => s.id === selected)?.name ?? "Student";
-    setMessage({
-      ok: true,
-      // The password is shown once, here, because there is no email to send it
-      // to and no self-service reset — if it is not written down now, the only
-      // fix is creating the account again.
-      text: `${who} can now sign in as "${normaliseUsername(username)}" with the password you set. Write it down — there is no reset email.`,
-    });
+    setMessage({ ok: true, text: `${who} can now sign in as "${normaliseUsername(username)}".` });
     setSelected("");
     setUsername("");
-    setPassword("");
+    setUid("");
     load();
   };
 
@@ -73,18 +66,45 @@ export const StudentAccounts = ({ students }: Props) => {
     "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500";
   const label = "block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1";
 
+  const previewEmail = username.trim() ? usernameToEmail(username) : "<username>@students.fluence.local";
+
   return (
     <div className="space-y-4">
-      <p className="text-xs text-slate-400">
-        Students sign in with a username and password — no email, so nothing to confirm
-        and nobody needs an inbox. Only you can create accounts, so nobody outside the
-        class can appear on the leaderboard.
-      </p>
+      {/* Why this is a two-step job rather than a button. */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 space-y-2">
+        <h5 className="text-xs font-black text-indigo-900 uppercase tracking-wider">
+          Step 1 — create the login in Supabase
+        </h5>
+        <ol className="text-[11px] text-indigo-800 font-semibold leading-relaxed list-decimal pl-4 space-y-1">
+          <li>
+            Open{" "}
+            <a
+              href={DASHBOARD_USERS}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline inline-flex items-center gap-0.5"
+            >
+              Authentication → Users <ExternalLink className="w-3 h-3" />
+            </a>{" "}
+            and press <strong>Add user → Create new user</strong>.
+          </li>
+          <li>
+            Email: <code className="bg-white px-1 rounded font-mono">{previewEmail}</code>
+          </li>
+          <li>Set the password yourself, and tick <strong>Auto Confirm User</strong>.</li>
+          <li>Copy the new row's <strong>UID</strong> and paste it below.</li>
+        </ol>
+        <p className="text-[10px] text-indigo-700 leading-relaxed pt-1">
+          The browser cannot create these accounts: Supabase refuses any address whose domain
+          has no mail servers, and rate limits sign-ups to about two an hour. The dashboard
+          uses the admin API, which is subject to neither.
+        </p>
+      </div>
 
-      {/* New account */}
+      {/* Link */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
         <h5 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-          <UserPlus className="w-3.5 h-3.5" /> New account
+          <Link2 className="w-3.5 h-3.5" /> Step 2 — link it here
         </h5>
 
         <div>
@@ -113,37 +133,37 @@ export const StudentAccounts = ({ students }: Props) => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={label}>Username</label>
-            <input
-              className={field}
-              value={username}
-              autoCapitalize="none"
-              spellCheck={false}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="aman"
-            />
-          </div>
-          <div>
-            <label className={label}>Password</label>
-            <input
-              className={field}
-              type="text"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="min 6 characters"
-            />
-          </div>
+        <div>
+          <label className={label}>Username (what they type to sign in)</label>
+          <input
+            className={field}
+            value={username}
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="aman"
+          />
+        </div>
+
+        <div>
+          <label className={label}>User UID from the dashboard</label>
+          <input
+            className={`${field} font-mono text-xs`}
+            value={uid}
+            autoCapitalize="none"
+            spellCheck={false}
+            onChange={(e) => setUid(e.target.value)}
+            placeholder="c8c12db5-0893-430f-97fc-195b416d0232"
+          />
         </div>
 
         <button
-          onClick={() => void create()}
-          disabled={busy || !selected || password.length < 6 || username.trim().length < 3}
+          onClick={() => void link()}
+          disabled={busy || !selected || username.trim().length < 3 || uid.trim().length < 10}
           className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black text-xs rounded-xl transition-all active:scale-95 cursor-pointer"
         >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
-          Create account
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+          Link account
         </button>
 
         {message && (
@@ -161,7 +181,7 @@ export const StudentAccounts = ({ students }: Props) => {
       {/* Existing */}
       <div>
         <h5 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
-          Accounts {accounts ? `(${accounts.length})` : ""}
+          Linked accounts {accounts ? `(${accounts.length})` : ""}
         </h5>
 
         {!accounts && (
@@ -208,9 +228,9 @@ export const StudentAccounts = ({ students }: Props) => {
         </div>
 
         <p className="text-[10px] text-slate-400 font-semibold mt-3 leading-relaxed">
-          Removing an account takes away its access immediately. Deleting the underlying
-          login needs the service_role key, which never touches the browser — so the
-          sign-in still exists but grants nothing and appears nowhere.
+          Unlinking removes access immediately. The login itself still exists in Supabase —
+          deleting that needs the service_role key, which never touches the browser — but
+          without a link it grants nothing and appears nowhere.
         </p>
       </div>
     </div>

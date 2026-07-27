@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createClient, Session } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 /**
@@ -41,12 +41,13 @@ export interface Profile {
   username: string;
   studentId: string | null;
   role: Role;
+  createdAt: string;
 }
 
 async function loadProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id,username,student_id,role")
+    .select("id,username,student_id,role,created_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -56,6 +57,7 @@ async function loadProfile(userId: string): Promise<Profile | null> {
     username: data.username,
     studentId: data.student_id,
     role: data.role,
+    createdAt: data.created_at,
   };
 }
 
@@ -141,92 +143,60 @@ export async function changeOwnPassword(newPassword: string): Promise<string | n
 
 // ---------------------------------------------------------------------------
 // Provisioning (teacher only)
+//
+// Accounts are created in the Supabase dashboard, not from here, and the app
+// links them afterwards. That is not a shortcut — the browser sign-up endpoint
+// cannot do this job:
+//
+//   * It rejects any address whose domain has no MX records, so the synthetic
+//     @students.fluence.local addresses are refused outright.
+//   * It is rate limited to a couple of sign-ups an hour, so provisioning a
+//     class through it would take most of a day.
+//
+// The dashboard uses the admin API, which is subject to neither. The admin API
+// needs the service_role key, and that key must never reach a browser — so the
+// account is made there, and the part that confers membership is done here.
 // ---------------------------------------------------------------------------
 
-/**
- * Creating an account signs you in as it. That would throw the teacher out of
- * their own session mid-task, so provisioning runs on a second client with its
- * own storage key and no persistence: it signs the new user in, in a scope
- * nothing reads, and the teacher's session is untouched.
- */
-const provisioningClient = () =>
-  createClient(
-    import.meta.env.VITE_SUPABASE_URL as string,
-    import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        storageKey: "fluence-provisioning",
-      },
-    }
-  );
-
-export interface CreateAccountResult {
-  error: string | null;
-}
+const UUID_RULE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Creates a login and links it to a student on the roster.
+ * Links an account created in the dashboard to a student on the roster.
  *
- * The auth account and the profile are separate steps, and the profile is what
- * grants membership — so if the second step fails, the leftover account can do
- * nothing until the teacher retries.
+ * The profile row *is* the membership: until it exists the account can sign in
+ * and see exactly what a logged-out visitor sees.
  */
-export async function createStudentAccount(
+export async function linkStudentAccount(
+  userId: string,
   username: string,
-  password: string,
   studentId: string
-): Promise<CreateAccountResult> {
+): Promise<{ error: string | null }> {
+  const id = userId.trim().toLowerCase();
+  if (!UUID_RULE.test(id)) {
+    return { error: "That does not look like a user UID. Copy it from Authentication → Users." };
+  }
+
   const invalid = validateUsername(username);
   if (invalid) return { error: invalid };
-  if (password.length < 6) return { error: "Password must be at least 6 characters." };
 
-  const client = provisioningClient();
-  const { data, error } = await client.auth.signUp({
-    email: usernameToEmail(username),
-    password,
-  });
-
-  if (error) {
-    const m = error.message.toLowerCase();
-    if (m.includes("already registered") || m.includes("already been registered")) {
-      return { error: "That username is taken." };
-    }
-    if (m.includes("signups not allowed") || m.includes("signup is disabled")) {
-      return {
-        error:
-          "Sign-ups are disabled in Supabase. Turn on Authentication → Sign In / Providers → Allow new users to sign up.",
-      };
-    }
-    return { error: error.message };
-  }
-
-  const userId = data.user?.id;
-  if (!userId) {
-    return { error: "Supabase created no user. Check that email confirmation is turned off." };
-  }
-
-  // Written by the teacher's own session, so the row is created under their
-  // rights rather than the new account's.
-  const { error: profileError } = await supabase.from("profiles").insert({
-    id: userId,
+  const { error } = await supabase.from("profiles").insert({
+    id,
     username: normaliseUsername(username),
     student_id: studentId,
     role: "student",
   });
 
-  await client.auth.signOut();
+  if (!error) return { error: null };
 
-  if (profileError) {
-    return {
-      error: profileError.message.includes("duplicate")
-        ? "That username or student already has an account."
-        : profileError.message,
-    };
-  }
+  const m = error.message.toLowerCase();
+  if (m.includes("profiles_username_key")) return { error: "That username is already taken." };
+  if (m.includes("profiles_student_key")) return { error: "That student already has an account." };
+  if (m.includes("profiles_pkey") || m.includes("duplicate key"))
+    return { error: "That account is already linked." };
+  if (m.includes("foreign key") || m.includes("violates foreign key"))
+    return { error: "No account with that UID exists. Create it in the dashboard first." };
 
-  return { error: null };
+  return { error: error.message };
 }
 
 export interface StudentAccount {
