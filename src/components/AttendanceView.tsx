@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarCheck,
   Check,
@@ -12,20 +12,15 @@ import {
   UserRoundX,
   X,
 } from "lucide-react";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
+
 import { AttendanceStatus, Branch, Student } from "../types";
 import { fetchAttendance, markAttendance, markAttendanceBulk } from "../lib/hub";
 import { formatDateString, parseDateOnly } from "../lib/storage";
 import { StudentAvatar } from "./StudentAvatar";
 import { AttendanceHistory } from "./AttendanceHistory";
+import { SwipeDeck } from "./SwipeDeck";
 
 const BRANCHES: Branch[] = ["Mangla", "Sarkanda"];
-
-/** How far a card must travel before a slow drag counts. */
-const COMMIT_PX = 90;
-
-/** Minimum travel for a fast flick to count, so a twitch cannot commit. */
-const FLICK_MIN_PX = 45;
 
 interface Props {
   students: Student[];
@@ -148,7 +143,6 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
   }
 
   const current = pending[0];
-  const upNext = pending[1];
 
   return (
     <div className="space-y-4">
@@ -255,22 +249,47 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
             or swipe each one
           </p>
 
-          <div className="relative h-[340px] select-none">
-            {/* The next card, peeking behind. */}
-            {upNext && (
-              <div className="absolute inset-x-4 top-3 bottom-0 bg-white rounded-3xl border border-slate-200/70 scale-95 opacity-60" />
+          <SwipeDeck
+            className="h-[340px]"
+            items={pending.slice(0, 3)}
+            keyOf={(s) => s.id}
+            allowUp
+            onCommit={(student, dir) =>
+              void apply(student, dir === "right" ? "present" : dir === "up" ? "late" : "absent")
+            }
+            tint={{ right: "bg-emerald-100", left: "bg-rose-100", up: "bg-amber-100" }}
+            overlay={(dir) => (
+              <span
+                className={`border-4 font-black text-xl uppercase tracking-wider px-3 py-1 rounded-xl block ${
+                  dir === "right"
+                    ? "border-emerald-500 text-emerald-500 -rotate-12"
+                    : dir === "left"
+                      ? "border-rose-500 text-rose-500 rotate-12"
+                      : "border-amber-500 text-amber-500"
+                }`}
+              >
+                {dir === "right" ? "Present" : dir === "left" ? "Absent" : "Late"}
+              </span>
             )}
-
-            {/* No AnimatePresence: the card animates itself off-screen and only
-                then reports the result, so there is no exit to orchestrate —
-                and popLayout's layout projection was extra work per frame for
-                an absolutely positioned card that never reflows. */}
-            <SwipeCard
-              key={current.id}
-              student={current}
-              onCommit={(status) => void apply(current, status)}
-            />
-          </div>
+            renderItem={(student) => (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="p-1.5 rounded-full bg-gradient-to-tr from-emerald-400 via-indigo-500 to-purple-600 shadow-lg">
+                  <StudentAvatar presetId={student.avatarId} size="lg" />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mt-3 px-4 text-center truncate max-w-full">
+                  {student.name}
+                </h3>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
+                  {student.branch} Branch
+                </span>
+                <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                  <span>← Absent</span>
+                  <span className="text-amber-300">↑ Late</span>
+                  <span>Present →</span>
+                </div>
+              </div>
+            )}
+          />
 
           {/* Buttons alongside the gestures. Late gets one because an upward
               swipe is the least discoverable of the three, and because tapping
@@ -389,149 +408,3 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
     </div>
   );
 };
-
-
-/**
- * One draggable card: left absent, right present, up late.
- *
- * The card is animated imperatively rather than through `animate` props or
- * `dragSnapToOrigin`. Two reasons, both learned from the first version feeling
- * slightly wrong:
- *
- *  - On commit the card must leave in the direction it was thrown. Snapping it
- *    back to centre and cross-fading it out reads as the app fighting the
- *    gesture, which is what "not quite smooth" actually was.
- *  - Driving the motion values directly avoids a spring-back and a fly-out
- *    being scheduled against the same value at once.
- *
- * Only `transform` and `opacity` animate. The previous version interpolated
- * `backgroundColor` on every frame, which cannot be composited and forces a
- * repaint of the whole card sixty times a second — the tinting is now two
- * overlay layers whose opacity is driven off the drag position instead.
- */
-function SwipeCard({
-  student,
-  onCommit,
-}: {
-  student: Student;
-  onCommit: (status: AttendanceStatus) => void;
-}) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const leaving = useRef(false);
-
-  const rotate = useTransform(x, [-240, 240], [-15, 15]);
-  const presentOpacity = useTransform(x, [25, 110], [0, 1]);
-  const absentOpacity = useTransform(x, [-110, -25], [1, 0]);
-  const lateOpacity = useTransform(y, [-110, -25], [1, 0]);
-
-  // Tint layers, so colour never touches the paint path.
-  const presentTint = useTransform(x, [0, 160], [0, 0.5]);
-  const absentTint = useTransform(x, [-160, 0], [0.5, 0]);
-
-  const spring = { type: "spring" as const, stiffness: 500, damping: 38, restDelta: 0.5 };
-
-  const settle = () => {
-    animate(x, 0, spring);
-    animate(y, 0, spring);
-  };
-
-  const fly = (status: AttendanceStatus) => {
-    if (leaving.current) return;
-    leaving.current = true;
-
-    const throwX = status === "present" ? 1.4 : status === "absent" ? -1.4 : 0;
-    const ease = [0.2, 0.6, 0.35, 1] as const;
-
-    animate(x, throwX * window.innerWidth, { duration: 0.26, ease });
-    animate(y, status === "late" ? -window.innerHeight : 60, {
-      duration: 0.26,
-      ease,
-      // Hand over only once the card is gone, so the next one does not appear
-      // underneath this one mid-flight.
-      onComplete: () => onCommit(status),
-    });
-  };
-
-  return (
-    <motion.div
-      drag
-      dragMomentum={false}
-      dragElastic={0.8}
-      // Both axes are needed for the up-swipe, so the browser must not claim
-      // vertical movement for scrolling while the finger is on the card.
-      // Everything outside the deck still scrolls normally.
-      style={{ x, y, rotate, touchAction: "none", willChange: "transform" }}
-      onDragEnd={(_, info) => {
-        const { offset, velocity } = info;
-
-        // A flick counts without travelling the full distance, but it still has
-        // to travel *something*: velocity alone would let an accidental twitch
-        // on a stationary finger mark a student absent.
-        const far = (d: number) => Math.abs(d) > COMMIT_PX;
-        const flicked = (d: number, v: number) => Math.abs(v) > 600 && Math.abs(d) > FLICK_MIN_PX;
-
-        const vertical = Math.abs(offset.y) > Math.abs(offset.x);
-
-        if (vertical && offset.y < 0 && (far(offset.y) || flicked(offset.y, velocity.y))) {
-          fly("late");
-        } else if (offset.x > 0 && (far(offset.x) || flicked(offset.x, velocity.x))) {
-          fly("present");
-        } else if (offset.x < 0 && (far(offset.x) || flicked(offset.x, velocity.x))) {
-          fly("absent");
-        } else {
-          settle();
-        }
-      }}
-      initial={{ scale: 0.97, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
-      className="absolute inset-0 rounded-3xl bg-white border-2 border-slate-200 shadow-lg flex flex-col items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden"
-    >
-      <motion.div
-        style={{ opacity: presentTint }}
-        className="absolute inset-0 bg-emerald-100 pointer-events-none"
-      />
-      <motion.div
-        style={{ opacity: absentTint }}
-        className="absolute inset-0 bg-rose-100 pointer-events-none"
-      />
-
-      {/* Verdict stamps */}
-      <motion.div
-        style={{ opacity: presentOpacity }}
-        className="absolute top-6 left-6 border-4 border-emerald-500 text-emerald-500 font-black text-xl uppercase tracking-wider px-3 py-1 rounded-xl -rotate-12 pointer-events-none"
-      >
-        Present
-      </motion.div>
-      <motion.div
-        style={{ opacity: absentOpacity }}
-        className="absolute top-6 right-6 border-4 border-rose-500 text-rose-500 font-black text-xl uppercase tracking-wider px-3 py-1 rounded-xl rotate-12 pointer-events-none"
-      >
-        Absent
-      </motion.div>
-      <motion.div
-        style={{ opacity: lateOpacity }}
-        className="absolute bottom-14 left-1/2 -translate-x-1/2 border-4 border-amber-500 text-amber-500 font-black text-xl uppercase tracking-wider px-3 py-1 rounded-xl pointer-events-none"
-      >
-        Late
-      </motion.div>
-
-      <div className="p-1.5 rounded-full bg-gradient-to-tr from-emerald-400 via-indigo-500 to-purple-600 shadow-lg">
-        <StudentAvatar presetId={student.avatarId} size="lg" />
-      </div>
-      <h3 className="text-2xl font-black text-slate-900 mt-3 px-4 text-center truncate max-w-full">
-        {student.name}
-      </h3>
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
-        {student.branch} Branch
-      </span>
-
-      <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300 pointer-events-none">
-        <span>← Absent</span>
-        <span className="text-amber-300">↑ Late</span>
-        <span>Present →</span>
-      </div>
-    </motion.div>
-  );
-}

@@ -14,7 +14,7 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { motion } from "motion/react";
 import {
   generateRound,
   Level,
@@ -29,15 +29,13 @@ import {
   topicsForLevel,
 } from "../lib/mathQuiz";
 import { isMuted, setMuted, sfx } from "../lib/sfx";
+import { SwipeDeck } from "./SwipeDeck";
 import { recordGameSession } from "../lib/hub";
 
 /** Questions per Practice round. Survival runs until the lives are gone. */
 const PRACTICE_LENGTH = 12;
 /** Generated in blocks, so a long Survival run never runs dry mid-question. */
 const SURVIVAL_BLOCK = 30;
-
-const COMMIT_PX = 90;
-const FLICK_MIN_PX = 45;
 
 type Phase = "menu" | "chapters" | "playing" | "done";
 
@@ -563,9 +561,36 @@ export const SwipeMaths: React.FC<{ onExit: () => void; studentId: string | null
         )}
       </div>
 
-      <div className="relative h-[300px] select-none">
-        {current && <QuestionCard key={current.id} question={current} onAnswer={answer} />}
-      </div>
+      <SwipeDeck
+        className="h-[300px]"
+        items={round.slice(index, index + 3)}
+        keyOf={(q) => q.id}
+        onCommit={(_q, dir) => answer(dir === "right")}
+        onSettle={() => sfx.swipeBack()}
+        tint={{ right: "bg-emerald-100", left: "bg-rose-100" }}
+        overlay={(dir) => (
+          <span
+            className={`border-4 font-black text-lg uppercase tracking-wider px-3 py-1 rounded-xl block ${
+              dir === "right"
+                ? "border-emerald-500 text-emerald-500 -rotate-12"
+                : "border-rose-500 text-rose-500 rotate-12"
+            }`}
+          >
+            {dir === "right" ? "Correct" : "Wrong"}
+          </span>
+        )}
+        renderItem={(q) => (
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
+            <p className="text-2xl sm:text-3xl font-black text-slate-900 text-center leading-snug">
+              {q.prompt}
+            </p>
+            <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300">
+              <span>← Wrong</span>
+              <span>Correct →</span>
+            </div>
+          </div>
+        )}
+      />
 
       <div className="flex items-center justify-center gap-6">
         <button
@@ -649,92 +674,5 @@ function Header({
         {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
       </button>
     </div>
-  );
-}
-
-/**
- * The question card. Same imperative animation as the attendance deck: it
- * leaves in the direction it was thrown, and only transform and opacity
- * animate so the motion stays on the compositor.
- */
-function QuestionCard({
-  question,
-  onAnswer,
-}: {
-  question: Question;
-  onAnswer: (saidTrue: boolean) => void;
-}) {
-  const x = useMotionValue(0);
-  const leaving = useRef(false);
-
-  const rotate = useTransform(x, [-240, 240], [-12, 12]);
-  const trueOpacity = useTransform(x, [25, 110], [0, 1]);
-  const falseOpacity = useTransform(x, [-110, -25], [1, 0]);
-  const trueTint = useTransform(x, [0, 160], [0, 0.45]);
-  const falseTint = useTransform(x, [-160, 0], [0.45, 0]);
-
-  const fly = (saidTrue: boolean) => {
-    if (leaving.current) return;
-    leaving.current = true;
-    animate(x, (saidTrue ? 1.3 : -1.3) * window.innerWidth, {
-      duration: 0.24,
-      ease: [0.2, 0.6, 0.35, 1],
-      onComplete: () => onAnswer(saidTrue),
-    });
-  };
-
-  return (
-    <motion.div
-      drag="x"
-      dragMomentum={false}
-      dragElastic={0.7}
-      style={{ x, rotate, touchAction: "pan-y", willChange: "transform" }}
-      onDragEnd={(_, info) => {
-        const { offset, velocity } = info;
-        const far = Math.abs(offset.x) > COMMIT_PX;
-        const flicked = Math.abs(velocity.x) > 600 && Math.abs(offset.x) > FLICK_MIN_PX;
-        if (!far && !flicked) {
-          sfx.swipeBack();
-          animate(x, 0, { type: "spring", stiffness: 500, damping: 38 });
-          return;
-        }
-        fly(offset.x > 0);
-      }}
-      initial={{ scale: 0.97, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.16, ease: "easeOut" }}
-      className="absolute inset-0 rounded-3xl bg-white border-2 border-slate-200 shadow-lg flex flex-col items-center justify-center cursor-grab active:cursor-grabbing overflow-hidden px-6"
-    >
-      <motion.div
-        style={{ opacity: trueTint }}
-        className="absolute inset-0 bg-emerald-100 pointer-events-none"
-      />
-      <motion.div
-        style={{ opacity: falseTint }}
-        className="absolute inset-0 bg-rose-100 pointer-events-none"
-      />
-
-      <motion.div
-        style={{ opacity: trueOpacity }}
-        className="absolute top-5 left-5 border-4 border-emerald-500 text-emerald-500 font-black text-lg uppercase tracking-wider px-3 py-1 rounded-xl -rotate-12 pointer-events-none"
-      >
-        Correct
-      </motion.div>
-      <motion.div
-        style={{ opacity: falseOpacity }}
-        className="absolute top-5 right-5 border-4 border-rose-500 text-rose-500 font-black text-lg uppercase tracking-wider px-3 py-1 rounded-xl rotate-12 pointer-events-none"
-      >
-        Wrong
-      </motion.div>
-
-      <p className="relative text-2xl sm:text-3xl font-black text-slate-900 text-center leading-snug">
-        {question.prompt}
-      </p>
-
-      <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300 pointer-events-none">
-        <span>← Wrong</span>
-        <span>Correct →</span>
-      </div>
-    </motion.div>
   );
 }
