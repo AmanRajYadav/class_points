@@ -11,9 +11,11 @@
 -- pg_trgm is enabled ready for the search indexes described further down; it
 -- costs nothing while unused. Wrapped because a restricted project may refuse
 -- the extension, and that must not stop the rest of the schema installing.
+-- Into `extensions`, not `public`: an extension in the exposed schema puts its
+-- functions on the Data API surface, which is what the database linter flags.
 do $$
 begin
-  create extension if not exists pg_trgm;
+  create extension if not exists pg_trgm with schema extensions;
 exception when others then
   raise notice 'pg_trgm unavailable (%).', sqlerrm;
 end $$;

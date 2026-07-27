@@ -133,11 +133,6 @@ as $$
   select public.is_admin();
 $$;
 
--- can_mark_points() was the name an earlier draft of this file used, before
--- the teacher's remit grew past points. Dropped so nothing keeps calling a
--- predicate that no longer describes what a teacher may do.
-drop function if exists public.can_mark_points();
-
 -- Postgres grants EXECUTE to PUBLIC on every new function, which makes a
 -- security definer function in a public schema a callable API by default. That
 -- is harmless for these four — each answers "what am I?" about the caller and
@@ -349,6 +344,19 @@ exception when insufficient_privilege then
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- 4j. RETIRE THE EARLIER DRAFT'S PREDICATE
+--
+-- can_mark_points() was this file's first shape, before the teacher's remit
+-- grew past points. It has to be dropped *here*, after section 4, not beside
+-- the other function definitions: a policy creates a dependency on every
+-- function it calls, so dropping it while daily_points still referenced it
+-- fails outright. Which is the right failure — it means nothing can vanish out
+-- from under a live policy — but it does dictate the order.
+-- ---------------------------------------------------------------------------
+
+drop function if exists public.can_mark_points();
+
+-- ---------------------------------------------------------------------------
 -- 5. TABLE GRANTS — A DEADLINE, NOT A PREFERENCE
 --
 -- Supabase is removing automatic exposure of public tables to the Data API.
@@ -394,6 +402,53 @@ to authenticated;
 
 -- No sequence grants: every primary key here is a text key or a
 -- gen_random_uuid() default, so there is no sequence to advance.
+
+-- ---------------------------------------------------------------------------
+-- 5b. WHAT THE DATABASE LINTER FOUND
+--
+-- Three functions 08 missed, because it only swept the security definer ones.
+-- These three are security invoker, so a mutable search_path is a smaller
+-- problem — but it costs nothing to close and the linter is right to ask.
+-- Every name inside all three resolves from pg_catalog, which is always on the
+-- path, so an empty search_path breaks nothing.
+-- ---------------------------------------------------------------------------
+
+alter function public.cycle_start_for(date) set search_path = '';
+alter function public.cycle_end_for(date)   set search_path = '';
+alter function public.touch_updated_at()    set search_path = '';
+
+-- pg_trgm out of the exposed schema. Nothing references it — 08 dropped the
+-- one index that did — so this is a move, not a migration.
+do $$
+begin
+  alter extension pg_trgm set schema extensions;
+exception when others then
+  raise notice 'pg_trgm move skipped (%).', sqlerrm;
+end $$;
+
+-- WHAT IS DELIBERATELY LEFT WARNING
+--
+-- The linter also flags every security definer function as callable by anon and
+-- authenticated over /rest/v1/rpc/. For the five that exist only to be called
+-- inside a policy — is_admin, can_manage, can_teach, is_teacher,
+-- current_student_id — that cannot be fixed by revoking, and this was tested
+-- rather than assumed: revoking EXECUTE from `authenticated` and then writing a
+-- row as a teacher fails with
+--
+--     permission denied for function can_teach
+--
+-- A policy expression is evaluated with the querying role's privileges, so the
+-- grant is what makes RLS work at all. Revoking it does not harden the
+-- database, it takes the app down.
+--
+-- Leaving them callable is safe on its own terms: each answers a question about
+-- the caller. is_admin() returns false to a stranger; current_student_id()
+-- returns the caller's own roster id or null. There is no argument to vary and
+-- nothing to enumerate.
+--
+-- The remaining four — close_due_cycles, record_visit, record_game_session,
+-- leaderboard — are genuine public endpoints the app calls from logged-out
+-- pages. See 04 and 05 for why each is a function rather than a table grant.
 
 -- ---------------------------------------------------------------------------
 -- 6. CHECKS
