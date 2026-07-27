@@ -7,6 +7,8 @@ import {
   Loader2,
   Lock,
   RotateCcw,
+  ToggleLeft,
+  ToggleRight,
   Undo2,
   UserRoundCheck,
   UserRoundX,
@@ -21,6 +23,35 @@ import { AttendanceHistory } from "./AttendanceHistory";
 import { SwipeDeck } from "./SwipeDeck";
 
 const BRANCHES: Branch[] = ["Mangla", "Sarkanda"];
+
+/**
+ * Whether dragging the card marks anybody.
+ *
+ * Taking the register means holding the phone in one hand and looking at the
+ * room, not the screen — and a swipe deck will happily read a stray thumb as a
+ * decision about a real student. The switch has to survive a reload, because
+ * someone who turns swiping off has decided they do not want it at all, not
+ * just for this one register.
+ */
+const SWIPE_KEY = "fluence_attendance_swipe";
+
+const readSwipePref = (): boolean => {
+  try {
+    // Default on: swiping is the fast path, and the people who like it
+    // shouldn't have to switch it on every morning.
+    return localStorage.getItem(SWIPE_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+
+const writeSwipePref = (enabled: boolean) => {
+  try {
+    localStorage.setItem(SWIPE_KEY, enabled ? "1" : "0");
+  } catch {
+    /* Private mode, or storage full. The toggle still works for this session. */
+  }
+};
 
 interface Props {
   students: Student[];
@@ -37,6 +68,14 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
   const [error, setError] = useState<string | null>(null);
   /** Student ids in the order they were marked, for undo. */
   const [undoStack, setUndoStack] = useState<string[]>([]);
+  const [swipeEnabled, setSwipeEnabled] = useState<boolean>(readSwipePref);
+
+  const toggleSwipe = () => {
+    setSwipeEnabled((prev) => {
+      writeSwipePref(!prev);
+      return !prev;
+    });
+  };
 
   const roster = useMemo(
     () => students.filter((s) => s.branch === branch),
@@ -66,6 +105,11 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
     () => (marks ? roster.filter((s) => !marks[s.id]) : []),
     [roster, marks]
   );
+
+  // Anyone given the on-time point is already marked present before this screen
+  // opens: a trigger on daily_points writes it the moment the point is awarded,
+  // so they never reach `pending` and the deck only holds the real questions.
+  // See supabase/13_attendance_from_points.sql.
 
   const present = roster.filter((s) => marks?.[s.id] === "present").length;
   const absent = roster.filter((s) => marks?.[s.id] === "absent").length;
@@ -101,11 +145,10 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
     // safer than deleting, since an undo is usually followed by a re-mark.
   };
 
-  const markAllPresent = async () => {
-    if (pending.length === 0) return;
+  const markPresent = async (ids: string[]) => {
+    if (ids.length === 0) return;
     setBusy(true);
     setError(null);
-    const ids = pending.map((s) => s.id);
     setMarks((prev) => {
       const next = { ...(prev ?? {}) };
       for (const id of ids) next[id] = "present";
@@ -237,7 +280,7 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
       {mode === "today" && marks && current && (
         <>
           <button
-            onClick={() => void markAllPresent()}
+            onClick={() => void markPresent(pending.map((s) => s.id))}
             disabled={busy}
             className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-sm py-3.5 rounded-2xl shadow transition-all active:scale-95 cursor-pointer"
           >
@@ -245,14 +288,38 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
             Mark all {pending.length} present
           </button>
 
-          <p className="text-center text-[11px] font-black uppercase tracking-widest text-slate-400">
-            or swipe each one
-          </p>
+          {/* Swipe switch, directly above the card it governs so the thing
+              being turned off is the thing you are looking at. */}
+          <div className="flex items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/60 px-3.5 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                Swipe to mark
+              </p>
+              <p className="text-[10px] font-semibold text-slate-400 leading-snug">
+                {swipeEnabled ? "Drag the card, or use the buttons" : "Buttons only — the card is frozen"}
+              </p>
+            </div>
+            <button
+              onClick={toggleSwipe}
+              role="switch"
+              aria-checked={swipeEnabled}
+              aria-label="Swipe to mark attendance"
+              className={`shrink-0 flex items-center gap-1.5 pl-2.5 pr-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer border ${
+                swipeEnabled
+                  ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                  : "bg-slate-100 border-slate-200 text-slate-500"
+              }`}
+            >
+              {swipeEnabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+              {swipeEnabled ? "On" : "Off"}
+            </button>
+          </div>
 
           <SwipeDeck
             className="h-[340px]"
             items={pending.slice(0, 3)}
             keyOf={(s) => s.id}
+            disabled={!swipeEnabled}
             allowUp
             onCommit={(student, dir) =>
               void apply(student, dir === "right" ? "present" : dir === "up" ? "late" : "absent")
@@ -283,9 +350,15 @@ export const AttendanceView: React.FC<Props> = ({ students, editorMode, onUnlock
                   {student.branch} Branch
                 </span>
                 <div className="absolute bottom-4 inset-x-0 flex items-center justify-between px-6 text-[10px] font-black uppercase tracking-widest text-slate-300">
-                  <span>← Absent</span>
-                  <span className="text-amber-300">↑ Late</span>
-                  <span>Present →</span>
+                  {swipeEnabled ? (
+                    <>
+                      <span>← Absent</span>
+                      <span className="text-amber-300">↑ Late</span>
+                      <span>Present →</span>
+                    </>
+                  ) : (
+                    <span className="w-full text-center">Use the buttons below</span>
+                  )}
                 </div>
               </div>
             )}

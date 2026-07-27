@@ -54,6 +54,10 @@ interface Props<T> {
   tint?: Partial<Record<SwipeDir, string>>;
   /** Fired on release below threshold, for a sound cue. */
   onSettle?: () => void;
+  /** Freezes the top card. The stack still renders — it is showing you who is
+   *  up next — but it cannot be dragged, so an accidental brush of the screen
+   *  cannot commit anything. */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -66,6 +70,7 @@ export function SwipeDeck<T>({
   overlay,
   tint,
   onSettle,
+  disabled = false,
   className = "",
 }: Props<T>) {
   // Shared so the cards behind can react to the top card's travel.
@@ -88,6 +93,7 @@ export function SwipeDeck<T>({
               overlay={overlay}
               tint={tint}
               onSettle={onSettle}
+              disabled={disabled}
               onCommit={(dir) => onCommit(item, dir)}
             >
               {renderItem(item)}
@@ -140,6 +146,7 @@ function TopCard({
   tint,
   onCommit,
   onSettle,
+  disabled,
   children,
 }: {
   progress: MotionValue<number>;
@@ -148,6 +155,7 @@ function TopCard({
   tint?: Partial<Record<SwipeDir, string>>;
   onCommit: (dir: SwipeDir) => void;
   onSettle?: () => void;
+  disabled: boolean;
   children: ReactNode;
 }) {
   const x = useMotionValue(0);
@@ -225,7 +233,7 @@ function TopCard({
   return (
     <motion.div
       ref={ref}
-      drag
+      drag={!disabled}
       dragMomentum={false}
       dragElastic={0.85}
       onPointerDown={anchorToPointer}
@@ -260,14 +268,17 @@ function TopCard({
         y,
         rotate,
         // Both axes are needed when up commits something; otherwise let the
-        // page scroll vertically through the card.
-        touchAction: allowUp ? "none" : "pan-y",
+        // page scroll vertically through the card. Frozen, the card claims no
+        // gestures at all, so the page scrolls straight through it.
+        touchAction: disabled ? "auto" : allowUp ? "none" : "pan-y",
         willChange: "transform",
       }}
       initial={{ scale: 0.97, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.16, ease: "easeOut" }}
-      className="absolute inset-0 rounded-3xl bg-white border-2 border-slate-200 shadow-lg overflow-hidden cursor-grab active:cursor-grabbing"
+      className={`absolute inset-0 rounded-3xl bg-white border-2 border-slate-200 shadow-lg overflow-hidden ${
+        disabled ? "" : "cursor-grab active:cursor-grabbing"
+      }`}
     >
       {tint?.right && (
         <motion.div style={{ opacity: rightTint }} className={`absolute inset-0 pointer-events-none ${tint.right}`} />

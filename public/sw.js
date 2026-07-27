@@ -1,6 +1,6 @@
 // Bump this string on every deploy that changes the app shell. Changing it
 // makes `activate` drop every older cache.
-const CACHE_NAME = "fluence-cache-v6";
+const CACHE_NAME = "fluence-cache-v7";
 
 // Everything below is resolved against the worker's own location, never the
 // domain root. On GitHub Pages the app is served from /<repo>/, so hardcoded

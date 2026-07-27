@@ -22,6 +22,10 @@ interface Props {
   /** Pre-filled when adding from inside a chapter. */
   seed?: Partial<Resource>;
   emptyHint?: string;
+  /** Pinned above the list, for things that ship with the app rather than
+   *  living in the resources table — Swipe Maths inside Games, say. Kept out of
+   *  the search filter on purpose: it is one card, always there. */
+  featured?: React.ReactNode;
 }
 
 export const ResourceList: React.FC<Props> = ({
@@ -37,6 +41,7 @@ export const ResourceList: React.FC<Props> = ({
   chapters,
   seed,
   emptyHint,
+  featured,
 }) => {
   const [items, setItems] = useState<Resource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +110,8 @@ export const ResourceList: React.FC<Props> = ({
           />
         </div>
       </div>
+
+      {featured}
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-700">

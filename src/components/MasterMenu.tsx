@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Activity,
-  Brain,
   CalendarCheck,
   ChevronRight,
   Gamepad2,
@@ -9,11 +8,14 @@ import {
   NotebookPen,
   Paperclip,
   Pencil,
+  RefreshCw,
+  Settings,
   Trophy,
   Zap,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { View } from "../lib/useRoute";
+import { buildLabel, forceRefresh } from "../lib/appUpdate";
 
 interface Tile {
   view: View;
@@ -63,16 +65,9 @@ const TILES: Tile[] = [
   {
     view: "games",
     label: "Games",
-    hint: "Practice games & quizzes",
+    hint: "Swipe Maths, plus every practice link",
     icon: Gamepad2,
     tint: "bg-violet-50 text-violet-600 border-violet-100",
-  },
-  {
-    view: "swipemaths",
-    label: "Swipe Maths",
-    hint: "True or false, one swipe each",
-    icon: Brain,
-    tint: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
   },
   {
     view: "leaderboard",
@@ -95,6 +90,17 @@ const TILES: Tile[] = [
     hint: "Videos, PDFs and links",
     icon: Paperclip,
     tint: "bg-amber-50 text-amber-600 border-amber-100",
+  },
+  // The desktop rail has had a Settings entry all along; on a phone there was
+  // no way in at all, which also meant a signed-in student could never reach
+  // their own profile card. Shown to everyone: the panel below the profile
+  // explains itself when you are not the head of the institution.
+  {
+    view: "config",
+    label: "Settings",
+    hint: "Your profile, password & institution setup",
+    icon: Settings,
+    tint: "bg-slate-100 text-slate-600 border-slate-200",
   },
 ];
 
@@ -123,6 +129,37 @@ const countFor = (view: View, counts: Record<string, number>): number | null => 
     default:
       return null;
   }
+};
+
+/**
+ * Build stamp and manual update.
+ *
+ * The service worker updates itself on its own, so the button is a last resort
+ * for a phone somehow still holding an old copy. The stamp beside it is the
+ * more useful half: it turns "it's showing the old version" from a guess into
+ * something checkable — read it out, compare it against the deploy.
+ */
+const UpdateFooter: React.FC = () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-1 pt-1">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+        Build {buildLabel()}
+      </p>
+      <button
+        onClick={() => {
+          setRefreshing(true);
+          void forceRefresh();
+        }}
+        disabled={refreshing}
+        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-700 disabled:text-slate-300 transition-colors cursor-pointer disabled:cursor-default"
+      >
+        <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
+        {refreshing ? "Updating…" : "Force update"}
+      </button>
+    </div>
+  );
 };
 
 export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpen }) => (
@@ -175,5 +212,7 @@ export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpe
         );
       })}
     </div>
+
+    <UpdateFooter />
   </div>
 );

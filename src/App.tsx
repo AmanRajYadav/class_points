@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, lazy, Suspense } from "react";
 import {
   Trophy,
   Award,
@@ -32,7 +32,8 @@ import {
   LayoutGrid,
   TreePine,
   Bookmark as BookmarkIcon,
-  Mic
+  Mic,
+  Brain
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Student, DailyPoint, AppSettings, AppState } from "./types";
@@ -71,7 +72,16 @@ import { Park } from "./components/Park";
 import { BookmarksView } from "./components/BookmarksView";
 import { SummaryView } from "./components/SummaryView";
 import { AttendanceView } from "./components/AttendanceView";
-import { SwipeMaths } from "./components/SwipeMaths";
+/**
+ * Swipe Maths carries the whole question generator (mathQuiz.ts) and the sound
+ * engine with it, and nothing else in the app imports either. Splitting it out
+ * keeps that weight off the first paint for everyone who opens the scoreboard
+ * and never plays — which is most visits, on the slow connections that are
+ * already the worst at picking up a new build.
+ */
+const SwipeMaths = lazy(() =>
+  import("./components/SwipeMaths").then((m) => ({ default: m.SwipeMaths }))
+);
 import { ActivityView } from "./components/ActivityView";
 
 type AppController = ReturnType<typeof useAppState>;
@@ -253,6 +263,44 @@ function TabButton({
       <Icon className="w-5.5 h-5.5" />
       <span className="text-[9px] font-black uppercase tracking-wider">{label}</span>
     </button>
+  );
+}
+
+/**
+ * Swipe Maths inside the Games list.
+ *
+ * It used to be its own tile on the master menu, which put a built-in game and
+ * a folder of game links on the same level. Games is the folder; this is the
+ * one entry in it that ships with the app, so it is pinned to the top and
+ * styled to look deliberately unlike the link cards below it.
+ */
+function SwipeMathsCard({ onOpen }: { onOpen: () => void }) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onOpen}
+      className="w-full text-left bg-gradient-to-br from-fuchsia-500 to-indigo-600 rounded-3xl p-4 sm:p-5 shadow-lg shadow-indigo-500/20 cursor-pointer group"
+    >
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 shrink-0 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center text-white">
+          <Brain className="w-6 h-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-white text-base leading-tight">Swipe Maths</h3>
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/70 bg-white/15 px-2 py-0.5 rounded-full">
+              Built in
+            </span>
+          </div>
+          <p className="text-xs font-semibold text-white/75 leading-snug mt-0.5">
+            True or false, one swipe each. Practice and Survival, by chapter.
+          </p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-white/60 group-hover:translate-x-0.5 transition-transform shrink-0" />
+      </div>
+    </motion.button>
   );
 }
 
@@ -903,7 +951,8 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               onToggleBookmark={hub.toggleBookmark}
               subjects={hub.subjects}
               chapters={hub.chapters}
-              emptyHint="Add game links once; students can find and bookmark them any time."
+              emptyHint="No links added yet. Swipe Maths above ships with the app and always works."
+              featured={<SwipeMathsCard onOpen={() => navigate({ view: "swipemaths" })} />}
             />
           )}
 
@@ -953,7 +1002,15 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           )}
 
           {route.view === "swipemaths" && (
-            <SwipeMaths onExit={() => navigate({ view: "menu" })} studentId={studentId} />
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-16">
+                  <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+                </div>
+              }
+            >
+              <SwipeMaths onExit={() => navigate({ view: "games" })} studentId={studentId} />
+            </Suspense>
           )}
 
           {route.view === "park" && (

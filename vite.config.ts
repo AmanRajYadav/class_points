@@ -11,6 +11,12 @@ export default defineConfig(() => {
     // and quietly hide every path bug until it reached production.
     // Override with BASE_PATH=/ for a custom domain or a root-hosted deploy.
     base: process.env.BASE_PATH ?? '/class_points/',
+    // Stamped into the bundle so the app can tell the user which build they are
+    // actually running. Without it, "it's showing the old version" is a report
+    // nobody can confirm or deny.
+    define: {
+      __BUILD_ID__: JSON.stringify(new Date().toISOString()),
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
