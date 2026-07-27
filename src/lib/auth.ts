@@ -9,20 +9,43 @@ import { supabase } from "./supabase";
  * only Supabase Auth ever sees, so students with no inbox can still have real
  * logins and there are no confirmation links to chase.
  *
- * Authority does not come from being signed in. Every write policy asks
- * `is_teacher()`, which reads a role off a profiles row only the teacher can
- * create — so an account without a profile can sign in and see precisely what
- * a logged-out visitor sees.
+ * Authority does not come from being signed in. Every write policy asks the
+ * database for a role off a profiles row only the head can create — so an
+ * account without a profile can sign in and see precisely what a logged-out
+ * visitor sees.
+ *
+ * There are four roles, and the split between them is the whole point: a hired
+ * subject teacher runs their lessons and touches nothing else.
+ *
+ *   admin    the head of the institution. Everything.
+ *   editor   the day-to-day: roster, library, Park tree, and all of the below.
+ *   teacher  four surfaces — points, the register, homework, the teaching log.
+ *   student  no writes beyond their own bookmarks and game sessions.
  */
 
-const STUDENT_DOMAIN = "students.fluence.local";
+/**
+ * The address carries the role, so an account says what it is on its face.
+ * None of these domains can receive mail — that is deliberate: no inbox to
+ * compromise, no confirmation link to chase.
+ */
+export const ROLE_DOMAIN: Record<Role, string> = {
+  admin: "admin.fluence.local",
+  editor: "editor.fluence.local",
+  teacher: "teacher.fluence.local",
+  student: "students.fluence.local",
+};
 
 /** Usernames are the visible identity, so keep them predictable. */
 export const normaliseUsername = (raw: string): string =>
   raw.trim().toLowerCase().replace(/\s+/g, "");
 
-export const usernameToEmail = (username: string): string =>
-  `${normaliseUsername(username)}@${STUDENT_DOMAIN}`;
+/**
+ * A bare username is a student — eleven of the thirteen accounts, and the only
+ * people who should never have to remember a domain. Staff type their address
+ * in full, which is unambiguous and is what `signIn` passes through untouched.
+ */
+export const usernameToEmail = (username: string, role: Role = "student"): string =>
+  `${normaliseUsername(username)}@${ROLE_DOMAIN[role]}`;
 
 export const USERNAME_RULE = /^[a-z0-9][a-z0-9._-]{2,19}$/;
 
@@ -34,7 +57,23 @@ export const validateUsername = (raw: string): string | null => {
   return null;
 };
 
-export type Role = "teacher" | "student";
+export type Role = "admin" | "editor" | "teacher" | "student";
+
+/** How a role is described to the person holding it. */
+export const ROLE_LABEL: Record<Role, string> = {
+  admin: "Head of institution",
+  editor: "Editor",
+  teacher: "Teacher",
+  student: "Student",
+};
+
+/** What each role can actually reach, in one line, for the profile screen. */
+export const ROLE_SCOPE: Record<Role, string> = {
+  admin: "Full access, including accounts and settings",
+  editor: "Roster, library and Park — everything except accounts and settings",
+  teacher: "Points, attendance, homework and the teaching log",
+  student: "Your own profile, bookmarks and games",
+};
 
 export interface Profile {
   id: string;
@@ -85,13 +124,25 @@ export function useSession() {
     };
   }, []);
 
+  const role = profile?.role ?? null;
+
   return {
     session,
     profile,
     ready,
-    /** Drives every edit control. The database checks this again on each write. */
-    isTeacher: profile?.role === "teacher",
-    isStudent: profile?.role === "student",
+    /**
+     * These decide which controls are drawn; the database decides what
+     * actually saves, and it checks the same three predicates by the same
+     * names (`is_admin`, `can_manage`, `can_teach` in 09_roles.sql).
+     *
+     * Three booleans rather than one `isTeacher`, because the old single flag
+     * meant "can do everything" — reusing it for a hire would have handed them
+     * the roster, the accounts and the trophy period along with their lessons.
+     */
+    isAdmin: role === "admin",
+    canManage: role === "admin" || role === "editor",
+    canTeach: role === "admin" || role === "editor" || role === "teacher",
+    isStudent: role === "student",
     studentId: profile?.studentId ?? null,
   };
 }
@@ -113,11 +164,11 @@ const friendly = (message: string): string => {
 /**
  * One sign-in for everybody.
  *
- * There is no separate teacher door, because there is no longer anything to
- * distinguish at this point: whether you are the teacher is a role on your
- * profile, read after the session exists. An address is passed through as
- * typed; anything else is treated as a student username and expanded to its
- * internal address.
+ * There is no separate staff door, because there is nothing to distinguish at
+ * this point: your role is a row on your profile, read after the session
+ * exists. An address is passed through as typed — which is how staff sign in,
+ * since their domain is what says which role they hold. Anything without an @
+ * is a student username and gets the students domain.
  *
  * The teacher's address used to be a build-time constant, which meant a
  * project whose owner signed up under any other address got "that password is
@@ -199,6 +250,76 @@ export async function linkStudentAccount(
   return { error: error.message };
 }
 
+/** The roles a hire can be given from the app. */
+export type StaffRole = "editor" | "teacher";
+
+/**
+ * Links a dashboard-created account to a member of staff.
+ *
+ * Never creates an `admin`. Making somebody head of the institution is a
+ * deliberate act and belongs in the SQL editor, where it cannot be a mis-tap
+ * in a dropdown. The database agrees: writing to profiles demands admin, so
+ * this call fails outright for anyone else — which is what stops a hire
+ * promoting themselves.
+ */
+export async function linkStaffAccount(
+  userId: string,
+  username: string,
+  role: StaffRole
+): Promise<{ error: string | null }> {
+  const id = userId.trim().toLowerCase();
+  if (!UUID_RULE.test(id)) {
+    return { error: "That does not look like a user UID. Copy it from Authentication → Users." };
+  }
+
+  const invalid = validateUsername(username);
+  if (invalid) return { error: invalid };
+
+  const { error } = await supabase.from("profiles").insert({
+    id,
+    username: normaliseUsername(username),
+    student_id: null,
+    role,
+  });
+
+  if (!error) return { error: null };
+
+  const m = error.message.toLowerCase();
+  if (m.includes("profiles_username_key")) return { error: "That username is already taken." };
+  if (m.includes("profiles_pkey") || m.includes("duplicate key"))
+    return { error: "That account is already linked." };
+  if (m.includes("foreign key"))
+    return { error: "No account with that UID exists. Create it in the dashboard first." };
+  if (m.includes("row-level security"))
+    return { error: "Only the head of the institution can add staff." };
+
+  return { error: error.message };
+}
+
+export interface StaffAccount {
+  id: string;
+  username: string;
+  role: Role;
+  createdAt: string;
+}
+
+export async function fetchStaffAccounts(): Promise<StaffAccount[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,username,role,created_at")
+    .in("role", ["admin", "teacher"])
+    .order("role")
+    .order("username");
+
+  if (error) return [];
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    username: r.username,
+    role: r.role,
+    createdAt: r.created_at,
+  }));
+}
+
 export interface StudentAccount {
   id: string;
   username: string;
@@ -225,7 +346,7 @@ export async function fetchStudentAccounts(): Promise<StudentAccount[]> {
  * behind — deleting it needs the service_role key, which must never reach the
  * browser — but without a profile it grants nothing and shows up nowhere.
  */
-export async function revokeStudentAccount(profileId: string): Promise<string | null> {
+export async function revokeAccount(profileId: string): Promise<string | null> {
   const { error } = await supabase.from("profiles").delete().eq("id", profileId);
   return error ? error.message : null;
 }

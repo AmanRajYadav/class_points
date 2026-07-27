@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, Check, GraduationCap, KeyRound, Loader2, LogOut, UserRound } from "lucide-react";
-import { Profile, changeOwnPassword, signOut } from "../lib/auth";
+import { Profile, ROLE_LABEL, ROLE_SCOPE, changeOwnPassword, signOut } from "../lib/auth";
 import { Student } from "../types";
 import { fetchLeaderboard, levelProgress, rankFor } from "../lib/xp";
 import { StudentAvatar } from "./StudentAvatar";
@@ -65,7 +65,7 @@ export const ProfileCard = ({ profile, students, onSignIn }: Props) => {
     );
   }
 
-  const isTeacher = profile.role === "teacher";
+  const isStaff = profile.role !== "student";
   const progress = xp !== null ? levelProgress(xp) : null;
   const rank = progress ? rankFor(progress.level) : null;
 
@@ -100,12 +100,12 @@ export const ProfileCard = ({ profile, students, onSignIn }: Props) => {
             </h3>
             <span
               className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                isTeacher
+                isStaff
                   ? "bg-amber-100 text-amber-700"
                   : "bg-indigo-100 text-indigo-700"
               }`}
             >
-              {profile.role}
+              {ROLE_LABEL[profile.role]}
             </span>
             {rank && (
               <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${rank.tint}`}>
@@ -134,9 +134,17 @@ export const ProfileCard = ({ profile, students, onSignIn }: Props) => {
         {student ? (
           <Fact icon={GraduationCap} label="Branch" value={`${student.branch}`} />
         ) : (
-          <Fact icon={UserRound} label="Role" value="Teacher" />
+          <Fact icon={UserRound} label="Role" value={ROLE_LABEL[profile.role]} />
         )}
       </div>
+
+      {/* What the role actually reaches. Worth stating plainly: a teacher who
+          does not know why a screen is read-only assumes the app is broken. */}
+      {isStaff && (
+        <p className="text-[11px] font-semibold text-slate-400 leading-relaxed -mt-1">
+          {ROLE_SCOPE[profile.role]}
+        </p>
+      )}
 
       {/* Level, students only */}
       {progress && (

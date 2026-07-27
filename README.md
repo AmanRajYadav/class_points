@@ -19,7 +19,7 @@ Built with React, Vite and Tailwind, backed by Supabase.
    ```bash
    npm install
    ```
-2. Create the database tables and the teacher account — see
+2. Create the database tables and the admin account — see
    [README-SUPABASE.md](README-SUPABASE.md). The app shows a setup screen until
    the schema exists.
 3. Copy [.env.example](.env.example) to `.env.local` and fill in
@@ -81,5 +81,5 @@ default in [vite.config.ts](vite.config.ts).
 | `src/lib/db.ts` | Supabase reads, writes, and the realtime subscription |
 | `src/lib/useAppState.ts` | Loads the board; optimistic edits + durable write queue |
 | `src/lib/storage.ts` | Score maths, half-month period rules, offline cache |
-| `src/lib/auth.ts` | Teacher session |
+| `src/lib/auth.ts` | Sessions and the four roles |
 | `supabase/schema.sql` | Tables, RLS policies, rollover function, cron job |

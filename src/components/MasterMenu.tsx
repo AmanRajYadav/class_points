@@ -100,7 +100,10 @@ const TILES: Tile[] = [
 
 interface Props {
   counts: Record<string, number>;
-  editorMode: boolean;
+  /** admin or editor — the tools that oversee the class rather than run it. */
+  canManage: boolean;
+  /** the above plus a subject teacher. */
+  canTeach: boolean;
   onOpen: (view: View) => void;
 }
 
@@ -122,19 +125,21 @@ const countFor = (view: View, counts: Record<string, number>): number | null => 
   }
 };
 
-export const MasterMenu: React.FC<Props> = ({ counts, editorMode, onOpen }) => (
+export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpen }) => (
   <div className="space-y-4">
     <div className="px-1">
       <h2 className="text-xl font-black text-slate-900 leading-tight">Everything in one place</h2>
       <p className="text-xs text-slate-400 font-semibold mt-0.5">
-        {editorMode
+        {canManage
           ? "Editor mode is on — you can add and edit anywhere."
-          : "Tap a tool to open it."}
+          : canTeach
+            ? "Points, attendance, homework and the teaching log are unlocked."
+            : "Tap a tool to open it."}
       </p>
     </div>
 
     <div className="grid grid-cols-2 gap-3">
-      {TILES.filter((t) => !t.teacherOnly || editorMode).map((tile, index) => {
+      {TILES.filter((t) => !t.teacherOnly || canManage).map((tile, index) => {
         const Icon = tile.icon;
         const count = countFor(tile.view, counts);
 

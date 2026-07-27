@@ -9,7 +9,14 @@ interface StudentDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   student: Student | null;
-  editorMode: boolean;
+  /**
+   * Two permissions, not one. A hired subject teacher awards the day's points;
+   * renaming a child, changing their avatar and removing them from the class
+   * belong to the head of the institution. Both are re-checked by row level
+   * security, so a stale prop cannot save anything.
+   */
+  canEditPoints: boolean;
+  canEditStudent: boolean;
   points: Record<string, DailyPoint>;
   onUpdatePoints: (studentId: string, date: string, category: keyof Omit<DailyPoint, "id" | "studentId" | "date">, value: number) => void;
   onRenameStudent: (studentId: string, newName: string) => void;
@@ -32,7 +39,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   isOpen,
   onClose,
   student,
-  editorMode,
+  canEditPoints,
+  canEditStudent,
   points,
   onUpdatePoints,
   onRenameStudent,
@@ -131,7 +139,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
     Math.min(100, (earned / (cycleDayCount * perDay)) * 100);
 
   const handleToggleCategory = (category: "onTime" | "homework" | "quiz", e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!editorMode) return;
+    if (!canEditPoints) return;
     const tapKey = `${student.id}_${category}`;
     const now = Date.now();
     if (now - (lastTapTimes.current[tapKey] || 0) < 350) return; // Debounce double taps
@@ -168,7 +176,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   };
 
   const handleBonusChange = (delta: number, e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!editorMode) return;
+    if (!canEditPoints) return;
     const tapKey = `${student.id}_bonus`;
     const Profilenow = Date.now();
     if (Profilenow - (lastTapTimes.current[tapKey] || 0) < 350) return; // Debounce
@@ -248,17 +256,19 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left mt-2">
               <div className="relative group">
                 <StudentAvatar presetId={student.avatarId} size="lg" className="ring-4 ring-white/30" />
-                <button
-                  onClick={() => setShowAvatarPicker(!showAvatarPicker)}
-                  className="absolute bottom-0 right-0 bg-yellow-400 hover:bg-yellow-500 text-slate-900 p-2.5 rounded-full shadow-lg transition-all scale-95 border-2 border-indigo-600 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
-                  title="Change Avatar"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                </button>
+                {canEditStudent && (
+                  <button
+                    onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+                    className="absolute bottom-0 right-0 bg-yellow-400 hover:bg-yellow-500 text-slate-900 p-2.5 rounded-full shadow-lg transition-all scale-95 border-2 border-indigo-600 min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+                    title="Change Avatar"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               <div className="flex-1 w-full">
-                {isEditingProfile && editorMode ? (
+                {isEditingProfile && canEditStudent ? (
                   <div className="flex flex-col gap-2 mt-1 w-full">
                     <input
                       type="text"
@@ -289,7 +299,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                   <div>
                     <div className="flex items-center justify-center sm:justify-start gap-2">
                       <h2 className="text-2xl font-black tracking-tight">{student.name}</h2>
-                      {editorMode && (
+                      {canEditStudent && (
                         <button
                           onClick={() => setIsEditingProfile(true)}
                           className="text-white/75 hover:text-white p-2.5 rounded-full hover:bg-white/10 transition-all min-h-[48px] min-w-[48px] flex items-center justify-center"
@@ -315,7 +325,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               </div>
 
               {/* Large Score Badge */}
-              {editorMode ? (
+              {canEditPoints ? (
                 <div 
                   onClick={() => {
                     if (!isEditingCyclePoints) {
@@ -447,12 +457,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               {/* On Time Category */}
               <button
                 onClick={(e) => handleToggleCategory("onTime", e)}
-                disabled={!editorMode}
+                disabled={!canEditPoints}
                 className={`p-4 h-24 sm:h-28 rounded-2xl border-3 flex flex-col items-center justify-center text-center transition-all ${
                   currentDayPoints.onTime > 0
                     ? "bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-200/50"
                     : "bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
-                } ${editorMode ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
+                } ${canEditPoints ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
                 style={{ touchAction: "manipulation" }}
               >
                 <div
@@ -471,12 +481,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               {/* Homework Category */}
               <button
                 onClick={(e) => handleToggleCategory("homework", e)}
-                disabled={!editorMode}
+                disabled={!canEditPoints}
                 className={`p-4 h-24 sm:h-28 rounded-2xl border-3 flex flex-col items-center justify-center text-center transition-all ${
                   currentDayPoints.homework > 0
                     ? "bg-amber-600 border-amber-400 text-white shadow-lg shadow-amber-200/50"
                     : "bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
-                } ${editorMode ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
+                } ${canEditPoints ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
                 style={{ touchAction: "manipulation" }}
               >
                 <div
@@ -495,12 +505,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               {/* Quiz Category */}
               <button
                 onClick={(e) => handleToggleCategory("quiz", e)}
-                disabled={!editorMode}
+                disabled={!canEditPoints}
                 className={`p-4 h-24 sm:h-28 rounded-2xl border-3 flex flex-col items-center justify-center text-center transition-all ${
                   currentDayPoints.quiz > 0
                     ? "bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-200/50"
                     : "bg-white border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50"
-                } ${editorMode ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
+                } ${canEditPoints ? "active:scale-95 cursor-pointer" : "opacity-70 cursor-not-allowed"}`}
                 style={{ touchAction: "manipulation" }}
               >
                 <div
@@ -539,7 +549,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 </div>
                 <span className="text-xs font-black uppercase tracking-wider">Teacher Bonus</span>
 
-                {editorMode ? (
+                {canEditPoints ? (
                   <div className="flex items-center gap-1.5 mt-1">
                     <button
                       onClick={(e) => handleBonusChange(-10, e)}
@@ -578,9 +588,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </div>
 
             {/* Accompanying info message for unlocked vs locked states */}
-            {!editorMode && (
+            {!canEditPoints && (
               <p className="text-[11px] text-slate-400 mt-3 font-semibold text-center italic">
-                🔒 Locked. Tap "Teacher Unlock" in settings to reward points.
+                🔒 Locked. Sign in as a teacher to award points.
               </p>
             )}
 
@@ -665,7 +675,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
             </div>
 
             {/* Delete Student Section for Editor Mode */}
-            {editorMode && (
+            {canEditStudent && (
               <div className="mt-6 pt-4 border-t border-slate-200">
                 {confirmDelete ? (
                   <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex flex-col items-center gap-2">

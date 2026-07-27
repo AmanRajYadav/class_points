@@ -259,13 +259,20 @@ function TabButton({
 function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const { mutate, replaceAll, status, pendingCount, retry, celebration, dismissCelebration, celebrate } = app;
 
-  // --- Teacher session ---
-  // `editorMode` only decides which controls are drawn. Row level security is
-  // what actually rejects writes from anyone who is not signed in.
-  // Signing in is not authority: `isTeacher` comes from a profile row only the
-  // teacher can create, and every write policy re-checks it in the database.
-  const { isTeacher, studentId, profile } = useSession();
-  const editorMode = isTeacher;
+  // --- Staff session ---
+  // These flags only decide which controls are drawn. Row level security is
+  // what actually rejects a write, and it re-checks the same three roles in the
+  // database — signing in is not authority.
+  //
+  // They are separate because the staff are not interchangeable:
+  //
+  //   isAdmin     the head. Accounts, settings, the trophy period, deletions.
+  //   editorMode  admin + editor. Roster, library, Park tree, activity.
+  //   teachMode   the above + a subject teacher. Points, register, homework,
+  //               teaching log — the four things running a lesson needs.
+  const { isAdmin, canManage, canTeach, studentId, profile } = useSession();
+  const editorMode = canManage;
+  const teachMode = canTeach;
 
   // --- Navigation ---
   // The URL hash is the single source of truth for where we are, so Android's
@@ -730,14 +737,14 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {/* Lock / Unlock Toggle Button */}
           <div className="flex items-center gap-2">
             <SyncBadge status={status} pendingCount={pendingCount} onRetry={retry} />
-            {editorMode ? (
+            {teachMode ? (
               <motion.div
                 initial={{ scale: 0.95 }}
                 animate={{ scale: 1 }}
                 className="flex items-center gap-1.5 bg-amber-500 text-slate-950 font-black text-xs px-3 py-2 rounded-xl shadow-md border-2 border-amber-400"
               >
                 <Unlock className="w-4 h-4" />
-                <span>EDITOR ON</span>
+                <span>{editorMode ? "EDITOR ON" : "TEACHER ON"}</span>
                 <button
                   onClick={() => void signOut()}
                   className="ml-2 bg-slate-950 text-white hover:bg-slate-800 px-2 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider transition-all cursor-pointer"
@@ -789,10 +796,14 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
       )}
 
       {/* Editor Warning Ribbon */}
-      {editorMode && (
+      {teachMode && (
         <div className="bg-amber-400 text-amber-950 px-4 py-2 text-center text-xs font-black tracking-wide flex items-center justify-center gap-2 shadow-inner">
           <Sparkles className="w-4 h-4 animate-spin" />
-          <span>TEACHER CONTROL ACTIVE: You can now adjust daily points, edit students, and trigger trophy resets.</span>
+          <span>
+            {editorMode
+              ? "EDITOR CONTROL ACTIVE: You can adjust daily points, edit students, and manage everything in the library."
+              : "TEACHER CONTROL ACTIVE: Points, attendance, homework and the teaching log. Everything else is read-only."}
+          </span>
         </div>
       )}
 
@@ -805,11 +816,11 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           <DeskNavItem icon={Trophy}     label="Points"     active={route.view === "points"}     onClick={() => setActiveTab("students")} />
           <DeskNavItem icon={TreePine}   label="Park"       active={route.view === "park"}       onClick={() => navigate({ view: "park" })} />
           <DeskNavItem icon={BookmarkIcon} label="Saved"    active={route.view === "bookmarks"}  onClick={() => navigate({ view: "bookmarks" })} />
+          {teachMode && (
+            <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
+          )}
           {editorMode && (
-            <>
-              <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
-              <DeskNavItem icon={Activity} label="Activity" active={route.view === "activity"} onClick={() => navigate({ view: "activity" })} />
-            </>
+            <DeskNavItem icon={Activity} label="Activity" active={route.view === "activity"} onClick={() => navigate({ view: "activity" })} />
           )}
           <DeskNavItem icon={Settings}   label="Settings"   active={route.view === "config"}     onClick={() => setActiveTab("settings")} />
 
@@ -852,7 +863,8 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {route.view === "menu" && (
             <MasterMenu
               counts={hub.counts}
-              editorMode={editorMode}
+              canManage={editorMode}
+              canTeach={teachMode}
               onOpen={(view: View) => navigate({ view })}
             />
           )}
@@ -860,7 +872,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {route.view === "attendance" && (
             <AttendanceView
               students={state.students}
-              editorMode={editorMode}
+              editorMode={teachMode}
               onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
@@ -915,7 +927,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               title="Homework"
               subtitle="What's due, and when"
               kinds={["homework"]}
-              editorMode={editorMode}
+              editorMode={teachMode}
               studentId={studentId}
               bookmarkedIds={hub.bookmarkedIds}
               onToggleBookmark={hub.toggleBookmark}
@@ -982,7 +994,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
           {route.view === "summary" && (
             <SummaryView
-              editorMode={editorMode}
+              editorMode={teachMode}
               onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
@@ -1061,24 +1073,26 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
                 {/* Quick actions for teacher */}
                 <div className="flex gap-2 w-full md:w-auto">
-                  {editorMode && (
-                    <>
-                      <button
-                        onClick={() => setIsQuickMarkOpen(true)}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
-                      >
-                        <Zap className="w-4 h-4 text-slate-950 fill-slate-950" />
-                        <span>Quick Mark</span>
-                      </button>
+                  {teachMode && (
+                    <button
+                      onClick={() => setIsQuickMarkOpen(true)}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 text-slate-950 fill-slate-950" />
+                      <span>Quick Mark</span>
+                    </button>
+                  )}
 
-                      <button
-                        onClick={() => setShowAddStudent(true)}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>Add Student</span>
-                      </button>
-                    </>
+                  {/* Changing who is on the roster is the head's call, not a
+                      subject teacher's. */}
+                  {editorMode && (
+                    <button
+                      onClick={() => setShowAddStudent(true)}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>Add Student</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1497,40 +1511,51 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {/* SETTINGS TAB */}
           {activeTab === "settings" && (
             <div className="space-y-6">
-              {/* Anyone signed in sees their own profile; the teacher panel
-                  below stays locked to the teacher. */}
+              {/* Anyone signed in sees and edits their own profile — including
+                  their password, which is how a hire changes the starter one.
+                  The panel below is the head's alone. */}
               <ProfileCard
                 profile={profile}
                 students={state.students}
                 onSignIn={() => setIsLoginOpen(true)}
               />
-              {/* Teacher settings panel (Unlock check) */}
+              {/* Head-of-institution panel.
+                  Gated on isAdmin rather than editorMode: this is the trophy
+                  period, the backups and the account list — the settings that
+                  decide who has access and how the money rules are measured.
+                  An editor runs the day-to-day; they do not change the rules. */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
                 <div className="flex items-center gap-3">
                   <div className="bg-indigo-50 p-2.5 rounded-2xl text-indigo-600 border border-indigo-100">
                     <Settings className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 leading-tight">Teacher Control Panel</h3>
+                    <h3 className="text-lg font-black text-slate-900 leading-tight">Institution Control Panel</h3>
                     <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                      Password, Trophy Period, and Backups
+                      Accounts, Trophy Period, and Backups
                     </p>
                   </div>
                 </div>
 
-                {!editorMode ? (
+                {!isAdmin ? (
                   <div className="bg-slate-50 rounded-2xl p-6 text-center border border-slate-200 flex flex-col items-center">
                     <Lock className="w-8 h-8 text-slate-400 mb-3" />
-                    <h4 className="font-extrabold text-slate-700 text-sm">Settings Locked</h4>
+                    <h4 className="font-extrabold text-slate-700 text-sm">
+                      {profile ? "Head of institution only" : "Settings Locked"}
+                    </h4>
                     <p className="text-slate-400 text-xs mt-1 max-w-xs">
-                      Please unlock Editor Mode using the button in the top header to configure settings.
+                      {profile
+                        ? "Accounts, the trophy period and backups are Aman's to change. Your own password is above."
+                        : "Sign in as the head of the institution to configure settings."}
                     </p>
-                    <button
-                      onClick={() => setIsLoginOpen(true)}
-                      className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer"
-                    >
-                      Unlock Now
-                    </button>
+                    {!profile && (
+                      <button
+                        onClick={() => setIsLoginOpen(true)}
+                        className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer"
+                      >
+                        Unlock Now
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -1917,7 +1942,8 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         isOpen={selectedStudent !== null}
         onClose={() => setSelectedStudent(null)}
         student={selectedStudent}
-        editorMode={editorMode}
+        canEditPoints={teachMode}
+        canEditStudent={editorMode}
         points={state.points}
         onUpdatePoints={handleUpdatePoints}
         onRenameStudent={handleRenameStudent}
@@ -1964,7 +1990,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           active={route.view === "bookmarks"}
           onClick={() => navigate({ view: "bookmarks" })}
         />
-        {editorMode ? (
+        {teachMode ? (
           <TabButton
             icon={Mic}
             label="Summary"
@@ -1980,10 +2006,10 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           />
         )}
         <TabButton
-          icon={editorMode ? Unlock : Lock}
-          label={editorMode ? "Lock" : "Unlock"}
+          icon={teachMode ? Unlock : Lock}
+          label={teachMode ? "Lock" : "Unlock"}
           active={false}
-          onClick={() => (editorMode ? void signOut() : setIsLoginOpen(true))}
+          onClick={() => (teachMode ? void signOut() : setIsLoginOpen(true))}
         />
       </div>
     </div>
