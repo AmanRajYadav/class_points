@@ -37,11 +37,13 @@ const SWIPE_KEY = "fluence_attendance_swipe";
 
 const readSwipePref = (): boolean => {
   try {
-    // Default on: swiping is the fast path, and the people who like it
-    // shouldn't have to switch it on every morning.
-    return localStorage.getItem(SWIPE_KEY) !== "0";
+    // Off unless switched on. The buttons below the card do the same job with
+    // no way to misfire, so the safe mode is the one that cannot silently mark
+    // the wrong student — and a wrong mark is worse than a slower register,
+    // because nothing on screen tells you it happened.
+    return localStorage.getItem(SWIPE_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 };
 
