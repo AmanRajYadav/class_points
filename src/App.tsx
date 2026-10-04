@@ -12,7 +12,6 @@ import {
   Upload,
   RotateCcw,
   Check,
-  Zap,
   ChevronRight,
   UserPlus,
   Calendar,
@@ -30,9 +29,7 @@ import {
   User,
   ArrowLeft,
   LayoutGrid,
-  TreePine,
-  Bookmark as BookmarkIcon,
-  Mic,
+  Gamepad2,
   Brain,
   ClipboardCheck
 } from "lucide-react";
@@ -65,15 +62,11 @@ import { Leaderboard } from "./components/Leaderboard";
 import { StudentAccounts } from "./components/StudentAccounts";
 import { ProfileCard } from "./components/ProfileCard";
 import { StudentDetailModal } from "./components/StudentDetailModal";
-import { QuickMark } from "./components/QuickMark";
 import { MarkSheet } from "./components/MarkSheet";
 import { TrophyAnimationModal } from "./components/TrophyAnimationModal";
 import { PastRecords } from "./components/PastRecords";
 import { MasterMenu } from "./components/MasterMenu";
 import { ResourceList } from "./components/ResourceList";
-import { Park } from "./components/Park";
-import { BookmarksView } from "./components/BookmarksView";
-import { SummaryView } from "./components/SummaryView";
 import { AttendanceView } from "./components/AttendanceView";
 /**
  * Swipe Maths carries the whole question generator (mathQuiz.ts) and the sound
@@ -318,9 +311,9 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // They are separate because the staff are not interchangeable:
   //
   //   isAdmin     the head. Accounts, settings, the trophy period, deletions.
-  //   editorMode  admin + editor. Roster, library, Park tree, activity.
-  //   teachMode   the above + a subject teacher. Points, register, homework,
-  //               teaching log — the four things running a lesson needs.
+  //   editorMode  admin + editor. Roster, game links, activity.
+  //   teachMode   the above + a subject teacher. Points and the register —
+  //               what running a lesson needs.
   const { isAdmin, canManage, canTeach, studentId, profile } = useSession();
   const editorMode = canManage;
   const teachMode = canTeach;
@@ -329,7 +322,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // The URL hash is the single source of truth for where we are, so Android's
   // back button walks back through the app instead of closing it.
   const { route, navigate, back } = useRoute();
-  const hub = useHub(studentId);
+  const hub = useHub();
   useVisitLog(studentId);
 
   // The four original screens still key off `activeTab`; it is now derived from
@@ -362,7 +355,6 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // --- Modals & Overlays ---
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [isQuickMarkOpen, setIsQuickMarkOpen] = useState<boolean>(false);
   const [showAddStudent, setShowAddStudent] = useState<boolean>(false);
 
   // --- Add Student Form State ---
@@ -852,8 +844,8 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           <Sparkles className="w-4 h-4 animate-spin" />
           <span>
             {editorMode
-              ? "EDITOR CONTROL ACTIVE: You can adjust daily points, edit students, and manage everything in the library."
-              : "TEACHER CONTROL ACTIVE: Points, attendance, homework and the teaching log. Everything else is read-only."}
+              ? "EDITOR CONTROL ACTIVE: You can adjust daily points, edit students, and manage the game links."
+              : "TEACHER CONTROL ACTIVE: Points and attendance. Everything else is read-only."}
           </span>
         </div>
       )}
@@ -868,11 +860,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           {teachMode && (
             <DeskNavItem icon={ClipboardCheck} label="Mark" active={route.view === "mark"} onClick={() => navigate({ view: "mark" })} />
           )}
-          <DeskNavItem icon={TreePine}   label="Park"       active={route.view === "park"}       onClick={() => navigate({ view: "park" })} />
-          <DeskNavItem icon={BookmarkIcon} label="Saved"    active={route.view === "bookmarks"}  onClick={() => navigate({ view: "bookmarks" })} />
-          {teachMode && (
-            <DeskNavItem icon={Mic} label="Summary" active={route.view === "summary"} onClick={() => navigate({ view: "summary" })} />
-          )}
+          <DeskNavItem icon={Gamepad2}   label="Games"      active={route.view === "games" || route.view === "swipemaths"} onClick={() => navigate({ view: "games" })} />
           {editorMode && (
             <DeskNavItem icon={Activity} label="Activity" active={route.view === "activity"} onClick={() => navigate({ view: "activity" })} />
           )}
@@ -898,7 +886,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               </h3>
               <p className="text-xs text-amber-700 font-semibold mt-1.5 leading-relaxed">
                 Run <code className="font-mono bg-amber-100 px-1 rounded">supabase/02_hub.sql</code> in
-                the Supabase SQL editor to switch on Park, Notes, Games, Notices and Attendance.
+                the Supabase SQL editor to switch on Games and Attendance.
               </p>
             </div>
           )}
@@ -942,79 +930,14 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             />
           )}
 
-          {route.view === "notes" && (
-            <ResourceList
-              title="Notes"
-              subtitle="Class notes, searchable"
-              kinds={["note"]}
-              editorMode={editorMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
-              emptyHint="Post notes here instead of the WhatsApp group and they stay findable by date and title."
-            />
-          )}
-
           {route.view === "games" && (
             <ResourceList
               title="Games"
               subtitle="Practice games & quizzes"
               kinds={["game"]}
               editorMode={editorMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
               emptyHint="No links added yet. Swipe Maths above ships with the app and always works."
               featured={<SwipeMathsCard onOpen={() => navigate({ view: "swipemaths" })} />}
-            />
-          )}
-
-          {route.view === "notices" && (
-            <ResourceList
-              title="Notices"
-              subtitle="Announcements you shouldn't miss"
-              kinds={["notice"]}
-              editorMode={editorMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
-              emptyHint="Tests, holidays, timing changes. Pin the urgent ones to the top."
-            />
-          )}
-
-          {route.view === "homework" && (
-            <ResourceList
-              title="Homework"
-              subtitle="What's due, and when"
-              kinds={["homework"]}
-              editorMode={teachMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
-              emptyHint="Each item can carry a due date, so nothing gets missed."
-            />
-          )}
-
-          {route.view === "resources" && (
-            <ResourceList
-              title="Resources"
-              subtitle="Videos, PDFs and links"
-              kinds={["video", "pdf", "link"]}
-              editorMode={editorMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
-              emptyHint="Anything worth keeping: YouTube explanations, PDFs, reference links."
             />
           )}
 
@@ -1030,45 +953,12 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             </Suspense>
           )}
 
-          {route.view === "park" && (
-            <Park
-              route={route}
-              boards={hub.boards}
-              subjects={hub.subjects}
-              chapters={hub.chapters}
-              editorMode={editorMode}
-              studentId={studentId}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              onNavigate={(next) => navigate({ view: "park", ...next })}
-              onTreeChanged={hub.refreshTree}
-            />
-          )}
-
-          {route.view === "bookmarks" && (
-            <BookmarksView
-              studentId={studentId}
-              username={profile?.username ?? null}
-              onSignIn={() => setIsLoginOpen(true)}
-              bookmarkedIds={hub.bookmarkedIds}
-              onToggleBookmark={hub.toggleBookmark}
-              editorMode={editorMode}
-            />
-          )}
-
           {route.view === "leaderboard" && <Leaderboard studentId={studentId} />}
 
           {route.view === "activity" && (
             <ActivityView
               students={state.students}
               editorMode={editorMode}
-              onUnlockRequest={() => setIsLoginOpen(true)}
-            />
-          )}
-
-          {route.view === "summary" && (
-            <SummaryView
-              editorMode={teachMode}
               onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
@@ -1154,16 +1044,6 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                     >
                       <ClipboardCheck className="w-4 h-4" />
                       <span>Mark the day</span>
-                    </button>
-                  )}
-
-                  {teachMode && (
-                    <button
-                      onClick={() => setIsQuickMarkOpen(true)}
-                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Zap className="w-4 h-4 text-slate-950 fill-slate-950" />
-                      <span>Quick Mark</span>
                     </button>
                   )}
 
@@ -2038,15 +1918,6 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         onUnlockRequest={() => setIsLoginOpen(true)}
       />
 
-      {/* Quick mark class overlay */}
-      <QuickMark
-        isOpen={isQuickMarkOpen}
-        onClose={() => setIsQuickMarkOpen(false)}
-        students={filteredStudents.map((s) => s.student)}
-        points={state.points}
-        onUpdatePoints={handleUpdatePoints}
-      />
-
       {/* Trophy Crowning Animation celebration Modal */}
       <TrophyAnimationModal
         isOpen={celebration.length > 0}
@@ -2062,33 +1933,26 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           active={route.view === "menu"}
           onClick={() => navigate({ view: "menu" })}
         />
-        <TabButton
-          icon={TreePine}
-          label="Park"
-          active={route.view === "park"}
-          onClick={() => navigate({ view: "park" })}
-        />
-        <TabButton
-          icon={BookmarkIcon}
-          label="Saved"
-          active={route.view === "bookmarks"}
-          onClick={() => navigate({ view: "bookmarks" })}
-        />
-        {teachMode ? (
+        {teachMode && (
           <TabButton
-            icon={Mic}
-            label="Summary"
-            active={route.view === "summary"}
-            onClick={() => navigate({ view: "summary" })}
-          />
-        ) : (
-          <TabButton
-            icon={Trophy}
-            label="Points"
-            active={route.view === "points"}
-            onClick={() => navigate({ view: "points", tab: "class" })}
+            icon={ClipboardCheck}
+            label="Mark"
+            active={route.view === "mark"}
+            onClick={() => navigate({ view: "mark" })}
           />
         )}
+        <TabButton
+          icon={Trophy}
+          label="Points"
+          active={route.view === "points"}
+          onClick={() => navigate({ view: "points", tab: "class" })}
+        />
+        <TabButton
+          icon={Gamepad2}
+          label="Games"
+          active={route.view === "games" || route.view === "swipemaths"}
+          onClick={() => navigate({ view: "games" })}
+        />
         <TabButton
           icon={teachMode ? Unlock : Lock}
           label={teachMode ? "Lock" : "Unlock"}

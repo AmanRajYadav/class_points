@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Bookmark as BookmarkIcon,
   ExternalLink,
   FileText,
   Gamepad2,
@@ -34,19 +33,13 @@ const formatDate = (iso: string) =>
 
 interface Props {
   resource: Resource;
-  bookmarked: boolean;
-  canBookmark: boolean;
   editorMode: boolean;
-  onToggleBookmark: (resource: Resource) => void;
   onEdit: (resource: Resource) => void;
 }
 
 export const ResourceCard: React.FC<Props> = ({
   resource,
-  bookmarked,
-  canBookmark,
   editorMode,
-  onToggleBookmark,
   onEdit,
 }) => {
   const meta = KIND_META[resource.kind] ?? KIND_META.link;
@@ -113,31 +106,15 @@ export const ResourceCard: React.FC<Props> = ({
         <div className="flex items-start gap-3 flex-1 min-w-0">{body}</div>
       )}
 
-      <div className="flex flex-col gap-1 shrink-0">
-        {canBookmark && (
-          <button
-            onClick={() => onToggleBookmark(resource)}
-            aria-label={bookmarked ? "Remove bookmark" : "Save bookmark"}
-            className={`p-2 rounded-xl transition-all active:scale-90 cursor-pointer ${
-              bookmarked
-                ? "text-amber-500 bg-amber-50"
-                : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            <BookmarkIcon className={`w-4 h-4 ${bookmarked ? "fill-amber-500" : ""}`} />
-          </button>
-        )}
-
-        {editorMode && (
-          <button
-            onClick={() => onEdit(resource)}
-            aria-label="Edit"
-            className="p-2 rounded-xl text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90 cursor-pointer"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      {editorMode && (
+        <button
+          onClick={() => onEdit(resource)}
+          aria-label="Edit"
+          className="shrink-0 p-2 rounded-xl text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-90 cursor-pointer"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 };

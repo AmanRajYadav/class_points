@@ -15,15 +15,8 @@ export type View =
   | "mark"
   | "attendance"
   | "games"
-  | "notes"
-  | "notices"
-  | "resources"
-  | "homework"
-  | "park"
   | "swipemaths"
   | "leaderboard"
-  | "bookmarks"
-  | "summary"
   | "activity"
   | "config";
 
@@ -33,11 +26,6 @@ export interface Route {
   view: View;
   /** Sub-tab within Points. */
   tab: PointsTab;
-  /** Park drill-down: board -> class -> subject -> chapter. */
-  board?: string;
-  classLevel?: number;
-  subjectId?: string;
-  chapterId?: string;
 }
 
 const VIEWS = new Set<string>([
@@ -46,15 +34,8 @@ const VIEWS = new Set<string>([
   "mark",
   "attendance",
   "games",
-  "notes",
-  "notices",
-  "resources",
-  "homework",
-  "park",
   "swipemaths",
   "leaderboard",
-  "bookmarks",
-  "summary",
   "activity",
   "config",
 ]);
@@ -73,31 +54,14 @@ export function parseHash(hash: string): Route {
     };
   }
 
-  if (head === "park") {
-    const level = parts[2] ? Number(parts[2]) : undefined;
-    return {
-      view: "park",
-      tab: "class",
-      board: parts[1],
-      classLevel: Number.isFinite(level) ? level : undefined,
-      subjectId: parts[3],
-      chapterId: parts[4],
-    };
-  }
-
   return { view: head as View, tab: "class" };
 }
 
 export function buildHash(route: Partial<Route> & { view: View }): string {
   const segments: (string | number | undefined)[] = [route.view];
 
-  if (route.view === "points") {
-    segments.push(route.tab ?? "class");
-  } else if (route.view === "park") {
-    segments.push(route.board, route.classLevel, route.subjectId, route.chapterId);
-  }
+  if (route.view === "points") segments.push(route.tab ?? "class");
 
-  // Stop at the first gap so a chapter id can never be read as a subject id.
   const path: string[] = [];
   for (const segment of segments) {
     if (segment === undefined || segment === null || segment === "") break;

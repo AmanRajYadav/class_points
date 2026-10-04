@@ -182,8 +182,8 @@ export const StudentAccounts = ({ students }: Props) => {
                 value={staffRole}
                 onChange={(e) => setStaffRole(e.target.value as StaffRole)}
               >
-                <option value="teacher">Teacher — points, attendance, homework, teaching log</option>
-                <option value="editor">Editor — the above plus roster, library and Park</option>
+                <option value="teacher">Teacher — points and attendance</option>
+                <option value="editor">Editor — the above plus roster and game links</option>
               </select>
               <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-relaxed">
                 Head of institution is not offered here. Promoting someone to that is done in the

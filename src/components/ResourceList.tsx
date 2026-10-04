@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Search } from "lucide-react";
-import { Chapter, Resource, ResourceKind, Subject } from "../types";
+import { Resource, ResourceKind } from "../types";
 import { fetchResources } from "../lib/hub";
 import { ResourceCard } from "./ResourceCard";
 import { ResourceEditor } from "./ResourceEditor";
@@ -8,19 +8,9 @@ import { ResourceEditor } from "./ResourceEditor";
 interface Props {
   title: string;
   subtitle: string;
-  /** Which kinds this view shows. Games, Notes and Notices are each one kind;
-   *  Resources is the catch-all. */
+  /** Which kinds this view shows. The first is what "Add" creates. */
   kinds: ResourceKind[];
-  /** Restricts to a chapter — this is what makes Park a view of the same data. */
-  chapterId?: string;
   editorMode: boolean;
-  studentId: string | null;
-  bookmarkedIds: Set<string>;
-  onToggleBookmark: (resource: Resource) => void;
-  subjects: Subject[];
-  chapters: Chapter[];
-  /** Pre-filled when adding from inside a chapter. */
-  seed?: Partial<Resource>;
   emptyHint?: string;
   /** Pinned above the list, for things that ship with the app rather than
    *  living in the resources table — Swipe Maths inside Games, say. Kept out of
@@ -32,14 +22,7 @@ export const ResourceList: React.FC<Props> = ({
   title,
   subtitle,
   kinds,
-  chapterId,
   editorMode,
-  studentId,
-  bookmarkedIds,
-  onToggleBookmark,
-  subjects,
-  chapters,
-  seed,
   emptyHint,
   featured,
 }) => {
@@ -56,7 +39,7 @@ export const ResourceList: React.FC<Props> = ({
     setItems(null);
     setError(null);
 
-    fetchResources({ kinds, chapterId })
+    fetchResources({ kinds })
       .then((rows) => active && setItems(rows))
       .catch((e) => active && setError(e instanceof Error ? e.message : String(e)));
 
@@ -66,7 +49,7 @@ export const ResourceList: React.FC<Props> = ({
     // kindKey stands in for the kinds array so a new array identity on each
     // render does not refetch forever.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kindKey, chapterId, reloadKey]);
+  }, [kindKey, reloadKey]);
 
   // Filtering happens client-side: these lists are small, and it keeps typing
   // instant with no request per keystroke.
@@ -92,7 +75,7 @@ export const ResourceList: React.FC<Props> = ({
 
           {editorMode && (
             <button
-              onClick={() => setEditing({ kind: kinds[0], ...seed })}
+              onClick={() => setEditing({ kind: kinds[0] })}
               className="shrink-0 flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-3.5 py-2.5 rounded-2xl shadow transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" /> Add
@@ -142,10 +125,7 @@ export const ResourceList: React.FC<Props> = ({
             <ResourceCard
               key={resource.id}
               resource={resource}
-              bookmarked={bookmarkedIds.has(resource.id)}
-              canBookmark={studentId !== null}
               editorMode={editorMode}
-              onToggleBookmark={onToggleBookmark}
               onEdit={setEditing}
             />
           ))}
@@ -155,8 +135,6 @@ export const ResourceList: React.FC<Props> = ({
       <ResourceEditor
         open={editing !== null}
         initial={editing}
-        subjects={subjects}
-        chapters={chapters}
         onClose={() => setEditing(null)}
         onSaved={() => setReloadKey((k) => k + 1)}
       />

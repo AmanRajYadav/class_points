@@ -1,7 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getSpeechRecognition, transcriptionAvailable } from "./useVoiceNote";
 
-type Recognition = InstanceType<NonNullable<ReturnType<typeof getSpeechRecognition>>>;
+interface Recognition {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: any) => void) | null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  onerror: ((event: any) => void) | null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  onend: (() => void) | null;
+}
+
+const getSpeechRecognition = (): (new () => Recognition) | null => {
+  const w = window as unknown as Record<string, unknown>;
+  return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as (new () => Recognition) | null;
+};
+
+/** Every iOS browser is WebKit underneath, so the engine is what matters. */
+const isWebKitSpeech = (): boolean => {
+  const ua = navigator.userAgent;
+  const iOS = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const desktopSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua);
+  return iOS || desktopSafari;
+};
+
+/**
+ * True only where live transcription actually works.
+ *
+ * WebKit exposes webkitSpeechRecognition, so a plain feature check says yes
+ * and then the thing misbehaves: it stops returning results after the first
+ * phrase while holding the microphone open indefinitely.
+ */
+const transcriptionAvailable = (): boolean => getSpeechRecognition() !== null && !isWebKitSpeech();
 
 /**
  * Speech to text, and nothing else — no recording, no upload.

@@ -18,9 +18,9 @@ import { supabase } from "./supabase";
  * subject teacher runs their lessons and touches nothing else.
  *
  *   admin    the head of the institution. Everything.
- *   editor   the day-to-day: roster, library, Park tree, and all of the below.
- *   teacher  four surfaces — points, the register, homework, the teaching log.
- *   student  no writes beyond their own bookmarks and game sessions.
+ *   editor   the day-to-day: roster, game links, and all of the below.
+ *   teacher  points and the register.
+ *   student  no writes beyond their own game sessions.
  */
 
 /**
@@ -70,9 +70,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 /** What each role can actually reach, in one line, for the profile screen. */
 export const ROLE_SCOPE: Record<Role, string> = {
   admin: "Full access, including accounts and settings",
-  editor: "Roster, library and Park — everything except accounts and settings",
-  teacher: "Points, attendance, homework and the teaching log",
-  student: "Your own profile, bookmarks and games",
+  editor: "Roster and game links — everything except accounts and settings",
+  teacher: "Points and attendance",
+  student: "Your own profile and games",
 };
 
 export interface Profile {

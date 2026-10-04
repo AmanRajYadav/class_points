@@ -213,7 +213,7 @@ export function useAppState() {
     void load();
     if (queueRef.current.length > 0) void flush();
 
-    // Our own writes echo back as realtime events too, so a burst of Quick Mark
+    // Our own writes echo back as realtime events too, so a burst of marking
     // taps would otherwise trigger a refetch per tap. Coalesce them.
     let refetchTimer: number | null = null;
     const unsubscribe = subscribeToChanges(() => {

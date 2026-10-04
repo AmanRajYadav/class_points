@@ -5,10 +5,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   Gamepad2,
-  Megaphone,
-  NotebookPen,
-  Paperclip,
-  Pencil,
   RefreshCw,
   Settings,
   Trophy,
@@ -54,27 +50,6 @@ const TILES: Tile[] = [
     tint: "bg-emerald-50 text-emerald-600 border-emerald-100",
   },
   {
-    view: "homework",
-    label: "Homework",
-    hint: "What's due, and when",
-    icon: Pencil,
-    tint: "bg-teal-50 text-teal-600 border-teal-100",
-  },
-  {
-    view: "notices",
-    label: "Notices",
-    hint: "Announcements you shouldn't miss",
-    icon: Megaphone,
-    tint: "bg-rose-50 text-rose-600 border-rose-100",
-  },
-  {
-    view: "notes",
-    label: "Notes",
-    hint: "Class notes, searchable",
-    icon: NotebookPen,
-    tint: "bg-sky-50 text-sky-600 border-sky-100",
-  },
-  {
     view: "games",
     label: "Games",
     hint: "Swipe Maths, plus every practice link",
@@ -95,13 +70,6 @@ const TILES: Tile[] = [
     icon: Activity,
     tint: "bg-slate-100 text-slate-600 border-slate-200",
     teacherOnly: true,
-  },
-  {
-    view: "resources",
-    label: "Resources",
-    hint: "Videos, PDFs and links",
-    icon: Paperclip,
-    tint: "bg-amber-50 text-amber-600 border-amber-100",
   },
   // The desktop rail has had a Settings entry all along; on a phone there was
   // no way in at all, which also meant a signed-in student could never reach
@@ -125,23 +93,9 @@ interface Props {
   onOpen: (view: View) => void;
 }
 
-/** Count shown on a tile. Points and Attendance are not resource-backed. */
-const countFor = (view: View, counts: Record<string, number>): number | null => {
-  switch (view) {
-    case "notes":
-      return counts.note ?? 0;
-    case "games":
-      return counts.game ?? 0;
-    case "notices":
-      return counts.notice ?? 0;
-    case "homework":
-      return counts.homework ?? 0;
-    case "resources":
-      return (counts.video ?? 0) + (counts.pdf ?? 0) + (counts.link ?? 0);
-    default:
-      return null;
-  }
-};
+/** Count shown on a tile. Only Games is backed by a list of links. */
+const countFor = (view: View, counts: Record<string, number>): number | null =>
+  view === "games" ? counts.game ?? 0 : null;
 
 /**
  * Build stamp and manual update.
@@ -182,7 +136,7 @@ export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpe
         {canManage
           ? "Editor mode is on — you can add and edit anywhere."
           : canTeach
-            ? "Points, attendance, homework and the teaching log are unlocked."
+            ? "Points and attendance are unlocked."
             : "Tap a tool to open it."}
       </p>
     </div>
