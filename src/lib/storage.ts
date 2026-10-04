@@ -136,6 +136,55 @@ export const POINT_VALUES = { onTime: 50, homework: 100, quiz: 50 } as const;
 
 export type PointCategory = keyof typeof POINT_VALUES;
 
+/**
+ * Every fifth homework in a row earns a bonus. The database awards it (see
+ * supabase/15_homework_streak.sql, which holds the same three numbers); the
+ * app only counts the run so it can show how close someone is.
+ */
+export const HOMEWORK_STREAK = { days: 5, bonus: 100, since: "2026-10-04" } as const;
+
+/** Everything a day is worth, streak bonus included. */
+export const dayTotal = (p: DailyPoint): number =>
+  p.onTime + p.homework + p.quiz + p.bonus + (p.streak ?? 0);
+
+/**
+ * How many homeworks in a row each student is on, as of `upTo`.
+ *
+ * Counted in homework days, per branch: a day exists only if somebody in the
+ * branch was marked for homework, so a Sunday or an unmarked day cannot break
+ * a run. `upTo` itself only ever adds to a run — while the day is still being
+ * marked, "not yet" must not read as "missed".
+ */
+export const homeworkRuns = (
+  students: Student[],
+  points: Record<string, DailyPoint>,
+  upTo: string
+): Map<string, number> => {
+  const branchOf = new Map(students.map((s) => [s.id, s.branch]));
+  const done = new Set<string>();
+  const daysByBranch = new Map<string, Set<string>>();
+
+  for (const p of Object.values(points)) {
+    const branch = branchOf.get(p.studentId);
+    if (!branch || p.homework <= 0 || p.date < HOMEWORK_STREAK.since || p.date > upTo) continue;
+    done.add(`${p.studentId}_${p.date}`);
+    if (!daysByBranch.has(branch)) daysByBranch.set(branch, new Set());
+    daysByBranch.get(branch)!.add(p.date);
+  }
+
+  const runs = new Map<string, number>();
+  for (const student of students) {
+    const days = [...(daysByBranch.get(student.branch) ?? [])].sort();
+    let run = 0;
+    for (const day of days) {
+      if (done.has(`${student.id}_${day}`)) run++;
+      else if (day !== upTo) run = 0;
+    }
+    runs.set(student.id, run);
+  }
+  return runs;
+};
+
 export interface StudentScoreSummary {
   student: Student;
   cyclePoints: number;
@@ -174,7 +223,7 @@ export const calculateScores = (
     const summary = summaries.get(p.studentId);
     if (!summary) continue; // orphaned record for a deleted student
 
-    const total = p.onTime + p.homework + p.quiz + p.bonus;
+    const total = dayTotal(p);
     summary.lifetimePoints += total;
 
     const day = parseDateOnly(p.date).getTime();
@@ -183,7 +232,9 @@ export const calculateScores = (
       summary.categories.onTime += p.onTime;
       summary.categories.homework += p.homework;
       summary.categories.quiz += p.quiz;
-      summary.categories.bonus += p.bonus;
+      // The streak is a bonus the app gives rather than the teacher, and the
+      // breakdown has no fifth bar for it.
+      summary.categories.bonus += p.bonus + (p.streak ?? 0);
     }
   }
 

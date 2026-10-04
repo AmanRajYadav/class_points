@@ -6,6 +6,7 @@ import {
   Check,
   CheckCircle2,
   ClipboardCheck,
+  Flame,
   Loader2,
   Lock,
   Mic,
@@ -13,9 +14,17 @@ import {
   UserRoundX,
 } from "lucide-react";
 
-import { AttendanceStatus, Branch, DailyPoint, Student } from "../types";
+import { AttendanceStatus, Branch, DailyPoint, PointField, Student } from "../types";
 import { fetchAttendance, markAttendance, markAttendanceBulk } from "../lib/hub";
-import { formatDateString, parseDateOnly, POINT_VALUES, PointCategory } from "../lib/storage";
+import {
+  dayTotal,
+  formatDateString,
+  HOMEWORK_STREAK,
+  homeworkRuns,
+  parseDateOnly,
+  POINT_VALUES,
+  PointCategory,
+} from "../lib/storage";
 import { Arrival, parseQuickEntry, ParsedMark } from "../lib/quickEntry";
 import { useDictation } from "../lib/useDictation";
 import { StudentAvatar } from "./StudentAvatar";
@@ -36,12 +45,7 @@ interface Props {
   points: Record<string, DailyPoint>;
   editorMode: boolean;
   onUnlockRequest: () => void;
-  onUpdatePoints: (
-    studentId: string,
-    date: string,
-    category: keyof Omit<DailyPoint, "id" | "studentId" | "date">,
-    value: number
-  ) => void;
+  onUpdatePoints: (studentId: string, date: string, category: PointField, value: number) => void;
   /** Bonus points and the rest of the detail live on the student card. */
   onOpenStudent: (student: Student) => void;
 }
@@ -117,6 +121,18 @@ export const MarkSheet: React.FC<Props> = ({
   }, [load, editorMode]);
 
   const dayPoints = (student: Student) => points[`${student.id}_${date}`];
+
+  // The streak bonus is awarded by the database. On a project that has not
+  // been given the rule yet no row carries the field, and promising a bonus
+  // that will never arrive would be worse than saying nothing.
+  const streakRuleLive = useMemo(
+    () => Object.values(points).some((p) => p.streak !== undefined),
+    [points]
+  );
+  const runs = useMemo(
+    () => (streakRuleLive ? homeworkRuns(students, points, date) : new Map<string, number>()),
+    [streakRuleLive, students, points, date]
+  );
 
   const arrivalOf = (student: Student): ArrivalState => {
     // The point outranks the register: on time is on time, whatever else the
@@ -411,7 +427,8 @@ export const MarkSheet: React.FC<Props> = ({
             {roster.map((student) => {
               const day = dayPoints(student);
               const arrival = arrivalOf(student);
-              const total = day ? day.onTime + day.homework + day.quiz + day.bonus : 0;
+              const total = day ? dayTotal(day) : 0;
+              const run = runs.get(student.id) ?? 0;
 
               return (
                 <div key={student.id} className="flex items-center gap-2 py-2 px-1.5">
@@ -424,8 +441,19 @@ export const MarkSheet: React.FC<Props> = ({
                       <span className="block font-extrabold text-slate-800 text-sm truncate">
                         {student.name}
                       </span>
-                      <span className="block text-[10px] font-black font-mono text-slate-400 leading-tight">
+                      <span className="flex items-center gap-1.5 text-[10px] font-black font-mono text-slate-400 leading-tight">
                         {total !== 0 ? `${total > 0 ? "+" : ""}${total}` : "—"}
+                        {run > 0 && (
+                          <span
+                            className={`flex items-center gap-0.5 ${
+                              (day?.streak ?? 0) > 0 ? "text-orange-600" : "text-orange-400"
+                            }`}
+                            title={`${run} homework days in a row`}
+                          >
+                            <Flame className="w-3 h-3" />
+                            {run}
+                          </span>
+                        )}
                       </span>
                     </span>
                   </button>
@@ -470,8 +498,10 @@ export const MarkSheet: React.FC<Props> = ({
 
           <p className="text-[10px] font-semibold text-slate-400 text-center px-3 pt-3 pb-1 leading-snug">
             On time +{POINT_VALUES.onTime} · Homework +{POINT_VALUES.homework} · Quiz +
-            {POINT_VALUES.quiz}. Tap the arrival box again for late, then absent. Tap a name for
-            bonus points.
+            {POINT_VALUES.quiz}
+            {streakRuleLive &&
+              ` · ${HOMEWORK_STREAK.days} homeworks in a row +${HOMEWORK_STREAK.bonus}`}
+            . Tap the arrival box again for late, then absent. Tap a name for bonus points.
           </p>
 
           {/* Only once the register has been started, so an untouched day is

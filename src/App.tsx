@@ -37,10 +37,11 @@ import {
   ClipboardCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Student, DailyPoint, AppSettings, AppState } from "./types";
+import { Student, DailyPoint, AppSettings, AppState, PointField } from "./types";
 import {
   calculateScores,
   clearLegacyState,
+  dayTotal,
   daysBetween,
   formatDateString,
   formatPeriod,
@@ -425,7 +426,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   const handleUpdatePoints = (
     studentId: string,
     date: string,
-    category: keyof Omit<DailyPoint, "id" | "studentId" | "date">,
+    category: PointField,
     value: number
   ) => {
     mutate((prev) => {
@@ -622,7 +623,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         const student = state.students.find((s) => s.id === p.studentId);
         if (!student) return;
 
-        const dailyTotal = p.onTime + p.homework + p.quiz + p.bonus;
+        const dailyTotal = dayTotal(p);
         csvRows.push([
           escapeCSV(p.date),
           escapeCSV(p.studentId),
@@ -631,7 +632,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
           p.onTime,
           p.homework,
           p.quiz,
-          p.bonus,
+          p.bonus + (p.streak ?? 0),
           dailyTotal
         ].join(","));
       });

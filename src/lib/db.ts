@@ -29,6 +29,7 @@ interface DailyPointRow {
   homework: number;
   quiz: number;
   bonus: number;
+  streak?: number;
 }
 
 interface TrophyWinnerRow {
@@ -75,8 +76,11 @@ const toDailyPoint = (r: DailyPointRow): DailyPoint => ({
   homework: r.homework,
   quiz: r.quiz,
   bonus: r.bonus,
+  streak: r.streak,
 });
 
+// `streak` is left out on purpose: the database owns it, and sending it back
+// would let a stale offline write undo a bonus awarded since.
 const fromDailyPoint = (p: DailyPoint): DailyPointRow => ({
   id: p.id,
   student_id: p.studentId,

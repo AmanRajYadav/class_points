@@ -14,7 +14,16 @@ export interface DailyPoint {
   homework: number; // 0 or 1
   quiz: number; // 0 or 1
   bonus: number; // 0 to 5
+  /**
+   * The homework-streak bonus for this day. Awarded by the database (see
+   * supabase/15_homework_streak.sql) and never written from here. Missing on a
+   * project that has not run that script, and in a cache saved before it.
+   */
+  streak?: number;
 }
+
+/** The parts of a day a teacher sets by hand. */
+export type PointField = "onTime" | "homework" | "quiz" | "bonus";
 
 export interface TrophyWinner {
   id: string;

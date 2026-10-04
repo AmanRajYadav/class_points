@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Calendar, Edit2, Trash2, CheckCircle2, BookOpen, Award, Sparkles } from "lucide-react";
-import { Student, DailyPoint } from "../types";
+import { Student, DailyPoint, PointField } from "../types";
 import { StudentAvatar, AVATAR_PRESETS } from "./StudentAvatar";
-import { daysBetween, formatDateString, parseDateOnly, POINT_VALUES } from "../lib/storage";
+import { dayTotal, daysBetween, formatDateString, parseDateOnly, POINT_VALUES } from "../lib/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 interface StudentDetailModalProps {
@@ -18,7 +18,7 @@ interface StudentDetailModalProps {
   canEditPoints: boolean;
   canEditStudent: boolean;
   points: Record<string, DailyPoint>;
-  onUpdatePoints: (studentId: string, date: string, category: keyof Omit<DailyPoint, "id" | "studentId" | "date">, value: number) => void;
+  onUpdatePoints: (studentId: string, date: string, category: PointField, value: number) => void;
   onRenameStudent: (studentId: string, newName: string) => void;
   onUpdateAvatar: (studentId: string, newAvatarId: number) => void;
   onDeleteStudent: (studentId: string) => void;
@@ -115,7 +115,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
 
   (Object.values(points) as DailyPoint[]).forEach((p) => {
     if (p.studentId !== student.id) return;
-    const pts = p.onTime + p.homework + p.quiz + p.bonus;
+    const pts = dayTotal(p);
     lifetimeTotal += pts;
 
     const pDate = parseDateOnly(p.date).getTime();
@@ -123,7 +123,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       cycleOnTime += p.onTime;
       cycleHomework += p.homework;
       cycleQuiz += p.quiz;
-      cycleBonus += p.bonus;
+      cycleBonus += p.bonus + (p.streak ?? 0);
     }
   });
 
