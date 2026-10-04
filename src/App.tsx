@@ -33,7 +33,8 @@ import {
   TreePine,
   Bookmark as BookmarkIcon,
   Mic,
-  Brain
+  Brain,
+  ClipboardCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Student, DailyPoint, AppSettings, AppState } from "./types";
@@ -64,6 +65,7 @@ import { StudentAccounts } from "./components/StudentAccounts";
 import { ProfileCard } from "./components/ProfileCard";
 import { StudentDetailModal } from "./components/StudentDetailModal";
 import { QuickMark } from "./components/QuickMark";
+import { MarkSheet } from "./components/MarkSheet";
 import { TrophyAnimationModal } from "./components/TrophyAnimationModal";
 import { PastRecords } from "./components/PastRecords";
 import { MasterMenu } from "./components/MasterMenu";
@@ -862,6 +864,9 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
         <div className="hidden lg:flex lg:flex-col lg:col-span-1 gap-2">
           <DeskNavItem icon={LayoutGrid} label="Menu"       active={route.view === "menu"}       onClick={() => navigate({ view: "menu" })} />
           <DeskNavItem icon={Trophy}     label="Points"     active={route.view === "points"}     onClick={() => setActiveTab("students")} />
+          {teachMode && (
+            <DeskNavItem icon={ClipboardCheck} label="Mark" active={route.view === "mark"} onClick={() => navigate({ view: "mark" })} />
+          )}
           <DeskNavItem icon={TreePine}   label="Park"       active={route.view === "park"}       onClick={() => navigate({ view: "park" })} />
           <DeskNavItem icon={BookmarkIcon} label="Saved"    active={route.view === "bookmarks"}  onClick={() => navigate({ view: "bookmarks" })} />
           {teachMode && (
@@ -914,6 +919,17 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               canManage={editorMode}
               canTeach={teachMode}
               onOpen={(view: View) => navigate({ view })}
+            />
+          )}
+
+          {route.view === "mark" && (
+            <MarkSheet
+              students={state.students}
+              points={state.points}
+              editorMode={teachMode}
+              onUnlockRequest={() => setIsLoginOpen(true)}
+              onUpdatePoints={handleUpdatePoints}
+              onOpenStudent={setSelectedStudent}
             />
           )}
 
@@ -1130,6 +1146,16 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
                 {/* Quick actions for teacher */}
                 <div className="flex gap-2 w-full md:w-auto">
+                  {teachMode && (
+                    <button
+                      onClick={() => navigate({ view: "mark" })}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs px-4 py-2.5 rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <ClipboardCheck className="w-4 h-4" />
+                      <span>Mark the day</span>
+                    </button>
+                  )}
+
                   {teachMode && (
                     <button
                       onClick={() => setIsQuickMarkOpen(true)}

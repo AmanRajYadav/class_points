@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 export type View =
   | "menu"
   | "points"
+  | "mark"
   | "attendance"
   | "games"
   | "notes"
@@ -42,6 +43,7 @@ export interface Route {
 const VIEWS = new Set<string>([
   "menu",
   "points",
+  "mark",
   "attendance",
   "games",
   "notes",

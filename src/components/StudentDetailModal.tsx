@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, Calendar, Edit2, Trash2, CheckCircle2, BookOpen, Award, Sparkles } from "lucide-react";
 import { Student, DailyPoint } from "../types";
 import { StudentAvatar, AVATAR_PRESETS } from "./StudentAvatar";
-import { daysBetween, formatDateString, parseDateOnly } from "../lib/storage";
+import { daysBetween, formatDateString, parseDateOnly, POINT_VALUES } from "../lib/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 interface StudentDetailModalProps {
@@ -147,13 +147,8 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
 
     const currentValue = currentDayPoints[category] || 0;
     
-    let newValue = 0;
-    if (category === "onTime") {
-      newValue = currentValue === 50 ? 0 : 50;
-    } else {
-      newValue = currentValue === 100 ? 0 : 100;
-    }
-    
+    const newValue = currentValue > 0 ? 0 : POINT_VALUES[category];
+
     onUpdatePoints(student.id, selectedDate, category, newValue);
 
     // Trigger floating pop
@@ -474,7 +469,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 </div>
                 <span className="text-xs font-black uppercase tracking-wider">On-Time</span>
                 <span className="text-base font-black mt-0.5">
-                  {currentDayPoints.onTime > 0 ? "+50 pts" : "0 pts"}
+                  {currentDayPoints.onTime > 0 ? `+${currentDayPoints.onTime} pts` : "0 pts"}
                 </span>
               </button>
 
@@ -498,7 +493,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 </div>
                 <span className="text-xs font-black uppercase tracking-wider">Homework</span>
                 <span className="text-base font-black mt-0.5">
-                  {currentDayPoints.homework > 0 ? "+100 pts" : "0 pts"}
+                  {currentDayPoints.homework > 0 ? `+${currentDayPoints.homework} pts` : "0 pts"}
                 </span>
               </button>
 
@@ -522,7 +517,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 </div>
                 <span className="text-xs font-black uppercase tracking-wider">Quiz</span>
                 <span className="text-base font-black mt-0.5">
-                  {currentDayPoints.quiz > 0 ? "+100 pts" : "0 pts"}
+                  {currentDayPoints.quiz > 0 ? `+${currentDayPoints.quiz} pts` : "0 pts"}
                 </span>
               </button>
 
@@ -611,7 +606,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div
                       className="bg-blue-400 h-full rounded-full transition-all duration-300"
                       style={{ 
-                        width: `${barPercent(cycleOnTime, 50)}%` 
+                        width: `${barPercent(cycleOnTime, POINT_VALUES.onTime)}%` 
                       }}
                     />
                   </div>
@@ -627,7 +622,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div
                       className="bg-amber-400 h-full rounded-full transition-all duration-300"
                       style={{ 
-                        width: `${barPercent(cycleHomework, 100)}%` 
+                        width: `${barPercent(cycleHomework, POINT_VALUES.homework)}%` 
                       }}
                     />
                   </div>
@@ -643,7 +638,7 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                     <div
                       className="bg-emerald-400 h-full rounded-full transition-all duration-300"
                       style={{ 
-                        width: `${barPercent(cycleQuiz, 100)}%` 
+                        width: `${barPercent(cycleQuiz, POINT_VALUES.quiz)}%` 
                       }}
                     />
                   </div>

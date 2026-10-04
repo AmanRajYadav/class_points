@@ -3,6 +3,7 @@ import {
   Activity,
   CalendarCheck,
   ChevronRight,
+  ClipboardCheck,
   Gamepad2,
   Megaphone,
   NotebookPen,
@@ -24,9 +25,20 @@ interface Tile {
   icon: React.ElementType;
   tint: string;
   teacherOnly?: boolean;
+  /** Shown to anyone who can award points, subject teachers included. */
+  teachOnly?: boolean;
 }
 
 const TILES: Tile[] = [
+  // First, because it is the one thing a teacher opens the app for every day.
+  {
+    view: "mark",
+    label: "Mark the day",
+    hint: "On time, homework & quiz — tap or speak",
+    icon: ClipboardCheck,
+    tint: "bg-amber-50 text-amber-600 border-amber-100",
+    teachOnly: true,
+  },
   {
     view: "points",
     label: "Points",
@@ -176,7 +188,7 @@ export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpe
     </div>
 
     <div className="grid grid-cols-2 gap-3">
-      {TILES.filter((t) => !t.teacherOnly || canManage).map((tile, index) => {
+      {TILES.filter((t) => (!t.teacherOnly || canManage) && (!t.teachOnly || canTeach)).map((tile, index) => {
         const Icon = tile.icon;
         const count = countFor(tile.view, counts);
 

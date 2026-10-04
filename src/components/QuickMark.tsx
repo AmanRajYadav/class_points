@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { CheckCircle2, BookOpen, Award, Sparkles, ChevronLeft, ChevronRight, Check, X, Calendar } from "lucide-react";
 import { Student, DailyPoint } from "../types";
 import { StudentAvatar } from "./StudentAvatar";
-import { formatDateString } from "../lib/storage";
+import { formatDateString, POINT_VALUES } from "../lib/storage";
 import { motion, AnimatePresence } from "motion/react";
 
 interface QuickMarkProps {
@@ -85,12 +85,7 @@ export const QuickMark: React.FC<QuickMarkProps> = ({
 
     const currentValue = currentDayPoints[category] || 0;
     
-    let newValue = 0;
-    if (category === "onTime") {
-      newValue = currentValue === 50 ? 0 : 50;
-    } else {
-      newValue = currentValue === 100 ? 0 : 100;
-    }
+    const newValue = currentValue > 0 ? 0 : POINT_VALUES[category];
 
     // Call update points
     onUpdatePoints(currentStudent.id, selectedDate, category, newValue);
@@ -280,7 +275,7 @@ export const QuickMark: React.FC<QuickMarkProps> = ({
               <span className="text-[15px] font-black uppercase tracking-wide">On-Time</span>
             </div>
             <span className="text-lg font-black mt-1">
-              {currentDayPoints.onTime > 0 ? "+50 pts" : "0 pts"}
+              {currentDayPoints.onTime > 0 ? `+${currentDayPoints.onTime} pts` : "0 pts"}
             </span>
           </button>
 
@@ -299,7 +294,7 @@ export const QuickMark: React.FC<QuickMarkProps> = ({
               <span className="text-[15px] font-black uppercase tracking-wide">Homework</span>
             </div>
             <span className="text-lg font-black mt-1">
-              {currentDayPoints.homework > 0 ? "+100 pts" : "0 pts"}
+              {currentDayPoints.homework > 0 ? `+${currentDayPoints.homework} pts` : "0 pts"}
             </span>
           </button>
 
@@ -318,7 +313,7 @@ export const QuickMark: React.FC<QuickMarkProps> = ({
               <span className="text-[15px] font-black uppercase tracking-wide">Quiz</span>
             </div>
             <span className="text-lg font-black mt-1">
-              {currentDayPoints.quiz > 0 ? "+100 pts" : "0 pts"}
+              {currentDayPoints.quiz > 0 ? `+${currentDayPoints.quiz} pts` : "0 pts"}
             </span>
           </button>
 

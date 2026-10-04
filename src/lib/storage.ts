@@ -127,6 +127,15 @@ export function isAppStateShaped(value: unknown): value is AppState {
 // Scoring
 // ---------------------------------------------------------------------------
 
+/**
+ * What one tap is worth. Every marking screen reads these, so the three of
+ * them cannot drift apart again — the quiz used to be 100 in the buttons and
+ * 50 in practice, which pushed every quiz into the bonus box by hand.
+ */
+export const POINT_VALUES = { onTime: 50, homework: 100, quiz: 50 } as const;
+
+export type PointCategory = keyof typeof POINT_VALUES;
+
 export interface StudentScoreSummary {
   student: Student;
   cyclePoints: number;
