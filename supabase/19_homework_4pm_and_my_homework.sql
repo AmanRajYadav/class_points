@@ -1,0 +1,7 @@
+-- Fluence — applied to the live project on 19 Nov 2026, after 18. Recorded here as a pointer:
+--   1. submit_homework(): on time = the homework's own date, or before 16:00 India time the next day
+--      (Aman: "next day ke 4 baje tak agar kar dein to bhi chalega"). This replaces the same-day-only rule of 17.
+--   2. my_homework(date): returns the signed-in student's own ten questions for that day from
+--      homework_days, WITHOUT answers, so the homework is read and sent in the same screen and no
+--      WhatsApp forwarding is needed.
+-- The exact function bodies are in the live database (pg_get_functiondef); copy them here before the next change.

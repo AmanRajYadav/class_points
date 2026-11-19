@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   ChevronRight,
   ClipboardCheck,
+  FileUp,
   Gamepad2,
   RefreshCw,
   Settings,
@@ -34,6 +35,14 @@ const TILES: Tile[] = [
     icon: ClipboardCheck,
     tint: "bg-amber-50 text-amber-600 border-amber-100",
     teachOnly: true,
+  },
+  // Students send homework here and the point marks itself; staff see who sent.
+  {
+    view: "homework",
+    label: "Homework",
+    hint: "Bhejo, point apne aap. Sir: kisne bheja, kisne nahi",
+    icon: FileUp,
+    tint: "bg-rose-50 text-rose-600 border-rose-100",
   },
   {
     view: "points",

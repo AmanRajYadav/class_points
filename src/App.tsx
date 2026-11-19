@@ -79,6 +79,7 @@ const SwipeMaths = lazy(() =>
   import("./components/SwipeMaths").then((m) => ({ default: m.SwipeMaths }))
 );
 import { ActivityView } from "./components/ActivityView";
+import { HomeworkView } from "./components/HomeworkView";
 
 type AppController = ReturnType<typeof useAppState>;
 
@@ -919,6 +920,16 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               onUnlockRequest={() => setIsLoginOpen(true)}
               onUpdatePoints={handleUpdatePoints}
               onOpenStudent={setSelectedStudent}
+            />
+          )}
+
+          {route.view === "homework" && (
+            <HomeworkView
+              students={state.students}
+              points={state.points}
+              studentId={studentId}
+              canTeach={teachMode}
+              onUnlockRequest={() => setIsLoginOpen(true)}
             />
           )}
 

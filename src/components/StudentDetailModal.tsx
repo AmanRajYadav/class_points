@@ -4,6 +4,7 @@ import { Student, DailyPoint, PointField } from "../types";
 import { StudentAvatar, AVATAR_PRESETS } from "./StudentAvatar";
 import { dayTotal, daysBetween, formatDateString, parseDateOnly, POINT_VALUES } from "../lib/storage";
 import { motion, AnimatePresence } from "motion/react";
+import { HomeworkStrip, marksFor, useHomeworkWall } from "./HomeworkWall";
 
 interface StudentDetailModalProps {
   isOpen: boolean;
@@ -74,6 +75,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
       }
     }
   }, [isOpen, student]);
+
+  // Called before the early return below: hooks must run on every render.
+  const homeworkWall = useHomeworkWall();
 
   if (!isOpen || !student) return null;
 
@@ -440,6 +444,12 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Homework, day by day: crown = sent that day, tortoise = late, sleeping = not sent. */}
+          <div className="px-6 pt-5 flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Homework, last 7 days</h3>
+            <HomeworkStrip marks={marksFor(student.id, homeworkWall, points)} />
           </div>
 
           {/* Core Daily Point Buttons - THUMB REACH LOWER HALF */}
