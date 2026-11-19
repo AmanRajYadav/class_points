@@ -118,7 +118,23 @@ Also decide: are the pages readable; are they blank or unrelated to this homewor
 Set needs_review to true if anything is unreadable, blank, unrelated, machine-made, if fewer than 7 questions are attempted, or if 3 or more verdicts are "wrong" or "unclear". Otherwise false.
 In "reason" write one short plain sentence for the teacher. Notes are at most 12 words each.`;
 
-    const model = Deno.env.get("GEMINI_MODEL") ?? DEFAULT_MODEL;
+    // Google renames its models every few months, so unless GEMINI_MODEL names
+    // one, ask the key what it can use and take the newest plain Flash model
+    // (the kind the free plan carries).
+    let model = Deno.env.get("GEMINI_MODEL") ?? "";
+    if (!model) {
+      try {
+        const lr = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+        const names = (((await lr.json()).models ?? []) as { name: string; supportedGenerationMethods?: string[] }[])
+          .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+          .map((m) => m.name.replace("models/", ""))
+          .filter((n) => /^gemini-[\d.]+-flash$/.test(n))
+          .sort((a, b) => parseFloat(b.split("-")[1]) - parseFloat(a.split("-")[1]));
+        model = names[0] ?? DEFAULT_MODEL;
+      } catch {
+        model = DEFAULT_MODEL;
+      }
+    }
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
