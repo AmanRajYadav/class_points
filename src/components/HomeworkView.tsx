@@ -388,10 +388,10 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
     const lines = (ai.questions ?? [])
       .filter((q) => q.verdict !== "right")
       .map((q) => `Q${q.n}: ${q.verdict === "not_attempted" ? "chhoda" : q.verdict === "wrong" ? "galat" : "padha nahi gaya"}${q.mistake ? " - " + q.mistake : ""}${q.cause && q.cause !== "none" ? " (" + q.cause + ")" : ""}`);
-    window.alert([`${student.name}: ${ai.summary ?? ""}`, ai.reason ?? "", ...lines, ai.for_teacher ? "
-Aage: " + ai.for_teacher : "", "
-(AI ki padhai hai; likhawat galat bhi padh sakta hai.)"].filter(Boolean).join("
-"));
+    const text = [`${student.name}: ${ai.summary ?? ""}`, ai.reason ?? "", ...lines, ai.for_teacher ? "Aage: " + ai.for_teacher : "", "(AI ki padhai hai; likhawat galat bhi padh sakta hai.)"]
+      .filter(Boolean)
+      .join(String.fromCharCode(10));
+    window.alert(text);
   };
 
   const branches: Student["branch"][] = ["Sarkanda", "Mangla"];
