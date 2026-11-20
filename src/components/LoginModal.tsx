@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2, Lock, Unlock, X } from "lucide-react";
 import { motion } from "motion/react";
-import { clearFailedLogins, lockoutRemaining, noteFailedLogin, signIn } from "../lib/auth";
+import { clearFailedLogins, lockoutRemaining, noteFailedLogin, signIn, signInByName } from "../lib/auth";
 
 interface Props {
   isOpen: boolean;
@@ -53,7 +53,9 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
     setError(null);
     setBusy(true);
-    const message = await signIn(identifier, password);
+    // No password and no "@": a student signing in by name.
+    const byName = password.length === 0 && !identifier.includes("@");
+    const message = byName ? await signInByName(identifier) : await signIn(identifier, password);
     setBusy(false);
 
     if (message) {
@@ -101,7 +103,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
-              placeholder="Username"
+              placeholder="Apna naam (username)"
               value={identifier}
               onChange={(e) => {
                 setError(null);
@@ -120,7 +122,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <input
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
-                placeholder="Password"
+                placeholder="Password (sirf Sir / staff)"
                 value={password}
                 onChange={(e) => {
                   setError(null);
@@ -130,7 +132,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 className={`${field} pr-12 ${
                   error ? "border-red-400 bg-red-50/40 text-red-700" : ""
                 }`}
-                required
+                
               />
               <button
                 type="button"
@@ -151,7 +153,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
             <button
               type="submit"
-              disabled={busy || waitFor > 0 || password.length === 0 || identifier.length === 0}
+              disabled={busy || waitFor > 0 || identifier.length === 0}
               className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               {busy ? (
@@ -167,7 +169,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </form>
 
           <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
-            Just your username — students and staff alike. What anyone can edit is
+            Students: bas apna naam likho aur Sign in dabao. Staff: naam aur password. What anyone can edit is
             enforced by the database, not this screen.
           </p>
         </div>

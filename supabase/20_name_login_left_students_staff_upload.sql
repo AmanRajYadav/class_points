@@ -1,0 +1,10 @@
+-- Fluence — applied to the live project on 20 Nov 2026, after 19. Recorded here as a pointer:
+--   1. Logins for the seven students who had none (anshika, ayush, upanshu, vaidik, amal, darsh, sonal):
+--      auth.users rows with NO password, identities and profiles. Students sign in by name through the
+--      student-login Edge Function (supabase/functions/student-login), as Aman asked.
+--   2. students.left_on date: a student who has left keeps their history but is off every list
+--      (the app loads only left_on is null; student-login refuses them). Utsav: left_on = 2026-11-20.
+--   3. Storage policy homework_staff_insert (staff may put files in any student's homework folder) and
+--      submit_homework_for(student_id, date, files): staff upload homework that reached them on WhatsApp;
+--      it is accepted and the point is given.
+-- The exact bodies are in the live database; copy them here before the next change.

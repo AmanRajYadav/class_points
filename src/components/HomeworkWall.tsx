@@ -25,7 +25,7 @@ const ist = (offset = 0): string =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(Date.now() + offset * 86400000));
 
 /** The counting starts the day the wall was announced. */
-const WALL_START = "2026-11-19";
+const WALL_START = "2026-11-20";
 
 export function useHomeworkWall(): Map<string, "accepted" | "late"> {
   const [rows, setRows] = useState<WallRow[]>([]);

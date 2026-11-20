@@ -289,6 +289,37 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
   const [logins, setLogins] = useState<Set<string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
+  const [uploadFor, setUploadFor] = useState<Student | null>(null);
+  const [uploading, setUploading] = useState("");
+  const staffInput = useRef<HTMLInputElement>(null);
+
+  // Homework that reached Sir on WhatsApp: he puts it in for the student.
+  const uploadForStudent = async (files: File[]) => {
+    const student = uploadFor;
+    if (!student || files.length === 0) return;
+    try {
+      const paths: string[] = [];
+      const stamp = Date.now();
+      for (let i = 0; i < files.length; i++) {
+        setUploading(`${student.name}: page ${i + 1} of ${files.length}…`);
+        const { blob, ext, type } = await shrink(files[i]);
+        const path = `${student.id}/${hwDate}/${stamp}_${String(i + 1).padStart(2, "0")}.${ext}`;
+        const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: type });
+        if (error) throw new Error(error.message);
+        paths.push(path);
+      }
+      const { data, error } = await supabase.rpc("submit_homework_for", { p_student_id: student.id, p_hw_date: hwDate, p_files: paths });
+      if (error) throw new Error(error.message);
+      void supabase.functions.invoke("check-homework", { body: { submission_id: (data as Submission).id } }).catch(() => undefined);
+      await load();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Upload nahi hua.");
+    } finally {
+      setUploading("");
+      setUploadFor(null);
+      if (staffInput.current) staffInput.current.value = "";
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -343,8 +374,16 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
         <div>
           <h2 className="text-xl font-black text-slate-900 leading-tight">Homework</h2>
           <p className="text-xs text-slate-400 font-semibold mt-0.5">
-            {loading ? "Dekh rahe hain…" : `${sentCount} of ${students.length} ne bheja · ${niceDate(hwDate)} ka homework`}
+            {uploading || (loading ? "Dekh rahe hain…" : `${sentCount} of ${students.length} ne bheja · ${niceDate(hwDate)} ka homework`)}
           </p>
+          <input
+            ref={staffInput}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => void uploadForStudent(Array.from(e.target.files ?? []).slice(0, 20))}
+          />
         </div>
         <input
           type="date"
@@ -402,6 +441,17 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
                     ) : (
                       <Clock className={`w-4 h-4 ${noLogin ? "text-slate-200" : "text-rose-300"}`} />
                     )}
+                    <button
+                      onClick={() => {
+                        setUploadFor(student);
+                        staffInput.current?.click();
+                      }}
+                      disabled={Boolean(uploading)}
+                      title="Is bachche ka homework aap upload karo (WhatsApp par aaya ho to)"
+                      className="w-9 h-9 rounded-xl border border-indigo-200 bg-indigo-50 flex items-center justify-center text-indigo-600 cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </button>
                   </div>
                 );
               })}

@@ -210,6 +210,23 @@ async function resolveUsername(username: string): Promise<string> {
   return usernameToEmail(username);
 }
 
+/**
+ * A student signs in with just their name (Aman, 20 Nov 2026: "student could
+ * just put their name and login"). The student-login Edge Function checks the
+ * name is a student still in the class and returns a one-time token; staff are
+ * never served there and keep their passwords.
+ */
+export async function signInByName(username: string): Promise<string | null> {
+  const { data, error } = await supabase.functions.invoke("student-login", {
+    body: { username: normaliseUsername(username) },
+  });
+  if (error || !data?.token_hash) {
+    return "Is naam ka student login nahi mila. Spelling dekho, ya Sir se poochho.";
+  }
+  const { error: failed } = await supabase.auth.verifyOtp({ token_hash: data.token_hash, type: "magiclink" });
+  return failed ? "Login nahi ho paya. Ek baar phir try karo." : null;
+}
+
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }

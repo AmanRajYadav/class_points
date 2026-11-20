@@ -184,7 +184,8 @@ export async function closeDueCycles(): Promise<TrophyWinner[]> {
  *  simplest and the most reliable way to stay in sync. */
 export async function fetchAppState(): Promise<AppState> {
   const [students, points, winners, settings] = await Promise.all([
-    supabase.from("students").select("*").order("branch").order("name"),
+    // A student who has left keeps their history in the database but is off every list.
+    supabase.from("students").select("*").is("left_on", null).order("branch").order("name"),
     supabase.from("daily_points").select("*"),
     supabase.from("trophy_winners").select("*").order("awarded_at", { ascending: false }),
     supabase.from("app_settings").select("*").eq("id", 1).maybeSingle(),
