@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Check, Clock, FileText, Loader2, Upload, X } from "lucide-react";
+import { Camera, Check, Clock, FileText, Loader2, Sparkles, Upload, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { DailyPoint, Student } from "../types";
 import { HomeworkWall } from "./HomeworkWall";
@@ -33,7 +33,14 @@ interface Submission {
   submitted_at: string;
   status: Status;
   note: string | null;
-  ai: { summary?: string; needs_review?: boolean; reason?: string } | null;
+  ai: {
+    summary?: string;
+    needs_review?: boolean;
+    reason?: string;
+    for_teacher?: string;
+    error?: string;
+    questions?: { n: number; verdict: string; mistake?: string; cause?: string }[];
+  } | null;
 }
 
 interface Props {
@@ -366,6 +373,27 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
     else await load();
   };
 
+  // Run the AI reading again (Google is sometimes busy the first time), then show it.
+  const recheck = async (row: Submission) => {
+    setBusyId(row.id);
+    const { error } = await supabase.functions.invoke("check-homework", { body: { submission_id: row.id } });
+    setBusyId("");
+    if (error) window.alert("AI check abhi nahi ho paya. Thodi der baad phir dabao.");
+    await load();
+  };
+
+  const showAi = (student: Student, row: Submission) => {
+    const ai = row.ai;
+    if (!ai || ai.error) return void recheck(row);
+    const lines = (ai.questions ?? [])
+      .filter((q) => q.verdict !== "right")
+      .map((q) => `Q${q.n}: ${q.verdict === "not_attempted" ? "chhoda" : q.verdict === "wrong" ? "galat" : "padha nahi gaya"}${q.mistake ? " - " + q.mistake : ""}${q.cause && q.cause !== "none" ? " (" + q.cause + ")" : ""}`);
+    window.alert([`${student.name}: ${ai.summary ?? ""}`, ai.reason ?? "", ...lines, ai.for_teacher ? "
+Aage: " + ai.for_teacher : "", "
+(AI ki padhai hai; likhawat galat bhi padh sakta hai.)"].filter(Boolean).join("
+"));
+  };
+
   const branches: Student["branch"][] = ["Sarkanda", "Mangla"];
 
   return (
@@ -424,6 +452,9 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
                           </span>
                         )}
                         <Pill status={row.status} />
+                        <button onClick={() => showAi(student, row)} disabled={busyId === row.id} title="AI ne kya padha (dobara check ke liye bhi yahi)" className="w-9 h-9 rounded-xl border border-violet-200 bg-violet-50 flex items-center justify-center text-violet-600 cursor-pointer">
+                          {busyId === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        </button>
                         <button onClick={() => void openFiles(row.files)} title="Open" className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 cursor-pointer">
                           <FileText className="w-4 h-4" />
                         </button>

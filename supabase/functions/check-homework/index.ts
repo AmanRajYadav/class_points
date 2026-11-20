@@ -126,30 +126,41 @@ For every question that is wrong or left incomplete, fill "mistake" with the exa
 In "for_teacher" write two or three plain sentences: what this student should be taught or made to practise next, naming the kind of question. In "reason" write one short plain sentence. Notes are at most 12 words each.`;
 
     // Google renames its models every few months, so unless GEMINI_MODEL names
-    // one, ask the key what it can use and take the newest plain Flash model
-    // (the kind the free plan carries).
-    let model = Deno.env.get("GEMINI_MODEL") ?? "";
-    if (!model) {
-      try {
-        const lr = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
-        const names = (((await lr.json()).models ?? []) as { name: string; supportedGenerationMethods?: string[] }[])
-          .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
-          .map((m) => m.name.replace("models/", ""))
-          .filter((n) => /^gemini-[\d.]+-flash$/.test(n))
-          .sort((a, b) => parseFloat(b.split("-")[1]) - parseFloat(a.split("-")[1]));
-        model = names[0] ?? DEFAULT_MODEL;
-      } catch {
-        model = DEFAULT_MODEL;
+    // one, ask the key what it can use: newest plain Flash first, older ones as
+    // spares. Google often answers 503 "high demand" or 429; then wait and try
+    // again, and after two tries move to the next model.
+    let models: string[] = [];
+    const named = Deno.env.get("GEMINI_MODEL") ?? "";
+    try {
+      const lr = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key } });
+      models = (((await lr.json()).models ?? []) as { name: string; supportedGenerationMethods?: string[] }[])
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => m.name.replace("models/", ""))
+        .filter((x) => /^gemini-[\d.]+-flash$/.test(x))
+        .sort((a, b) => parseFloat(b.split("-")[1]) - parseFloat(a.split("-")[1]))
+        .slice(0, 3);
+    } catch { /* fall through to the default */ }
+    if (named) models = [named, ...models.filter((m) => m !== named)];
+    if (models.length === 0) models = [DEFAULT_MODEL];
+
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }, ...parts] }],
+      generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
+    });
+    let res: Response | null = null;
+    let model = models[0];
+    outer: for (const m of models) {
+      model = m;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+          method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body,
+        });
+        if (res.ok) break outer;
+        if (![429, 500, 503].includes(res.status)) break outer;
+        await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000));
       }
     }
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }, ...parts] }],
-        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
-      }),
-    });
+    if (!res) return json({ error: "failed", message: "no response" }, 500);
     if (!res.ok) {
       const text = (await res.text()).slice(0, 300);
       await admin.from("homework_submissions")
