@@ -147,20 +147,30 @@ In "for_teacher" write two or three plain sentences: what this student should be
       contents: [{ role: "user", parts: [{ text: prompt }, ...parts] }],
       generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: SCHEMA },
     });
+    // One try per model, 50 seconds each, two models at most: the function is
+    // cut off at 150 seconds, and on 20 Nov 2026 a busy model simply never answered.
     let res: Response | null = null;
     let model = models[0];
-    outer: for (const m of models) {
+    let lastError = "";
+    for (const m of models.slice(0, 2)) {
       model = m;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      try {
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
           method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body,
+          signal: AbortSignal.timeout(50000),
         });
-        if (res.ok) break outer;
-        if (![429, 500, 503].includes(res.status)) break outer;
-        await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000));
+        if (res.ok || ![429, 500, 503].includes(res.status)) break;
+      } catch (e) {
+        res = null;
+        lastError = `${m}: no answer in 50 seconds (${String(e).slice(0, 60)})`;
       }
     }
-    if (!res) return json({ error: "failed", message: "no response" }, 500);
+    if (!res) {
+      await admin.from("homework_submissions")
+        .update({ ai: { error: "Gemini timeout", detail: lastError, tried: models.slice(0, 2), needs_review: true, summary: "AI check nahi ho paya" }, ai_checked_at: new Date().toISOString() })
+        .eq("id", submission_id);
+      return json({ error: "gemini_timeout", detail: lastError }, 504);
+    }
     if (!res.ok) {
       const text = (await res.text()).slice(0, 300);
       await admin.from("homework_submissions")
