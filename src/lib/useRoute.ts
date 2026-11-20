@@ -14,6 +14,7 @@ export type View =
   | "points"
   | "mark"
   | "homework"
+  | "exams"
   | "attendance"
   | "games"
   | "swipemaths"
@@ -34,6 +35,7 @@ const VIEWS = new Set<string>([
   "points",
   "mark",
   "homework",
+  "exams",
   "attendance",
   "games",
   "swipemaths",

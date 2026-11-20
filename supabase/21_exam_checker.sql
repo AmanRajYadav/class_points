@@ -1,0 +1,8 @@
+-- Fluence — Exam Checker. Applied to the live project on 20 Nov 2026, after 20. Recorded here as a pointer:
+--   tables public.exams and public.exam_sheets, STAFF ONLY (one policy each: can_teach() for every action;
+--   students have no policy, so they read nothing and write nothing);
+--   private storage bucket "exams" (20 MB, images and PDF), staff only;
+--   homework_submissions.ai_runs (how many times the AI has read a homework; a student is capped at 3);
+--   exam_sheets added to the realtime publication.
+-- The AI side is supabase/functions/check-exam (refuses any caller for whom can_teach() is not true).
+-- Tested 20 Nov with a student's own token: check-exam 403, exams and exam_sheets read as empty, insert refused.

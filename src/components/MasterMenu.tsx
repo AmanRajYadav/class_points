@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileUp,
+  GraduationCap,
   Gamepad2,
   RefreshCw,
   Settings,
@@ -43,6 +44,15 @@ const TILES: Tile[] = [
     hint: "Scan and send. Teachers: who sent, who did not",
     icon: FileUp,
     tint: "bg-rose-50 text-rose-600 border-rose-100",
+  },
+  // Staff only. The database refuses students too; hiding the tile is a courtesy.
+  {
+    view: "exams",
+    label: "Exam Checker",
+    hint: "Scan a test, AI marks it, you review",
+    icon: GraduationCap,
+    tint: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    teachOnly: true,
   },
   {
     view: "points",

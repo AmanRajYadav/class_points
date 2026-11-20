@@ -31,6 +31,7 @@ import {
   LayoutGrid,
   Gamepad2,
   FileUp,
+  GraduationCap,
   Brain,
   ClipboardCheck
 } from "lucide-react";
@@ -81,6 +82,7 @@ const SwipeMaths = lazy(() =>
 );
 import { ActivityView } from "./components/ActivityView";
 import { HomeworkView } from "./components/HomeworkView";
+import { ExamChecker } from "./components/ExamChecker";
 
 type AppController = ReturnType<typeof useAppState>;
 
@@ -863,6 +865,9 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
             <DeskNavItem icon={ClipboardCheck} label="Mark" active={route.view === "mark"} onClick={() => navigate({ view: "mark" })} />
           )}
           <DeskNavItem icon={FileUp}     label="Homework"   active={route.view === "homework"}   onClick={() => navigate({ view: "homework" })} />
+          {teachMode && (
+            <DeskNavItem icon={GraduationCap} label="Exams" active={route.view === "exams"} onClick={() => navigate({ view: "exams" })} />
+          )}
           <DeskNavItem icon={Gamepad2}   label="Games"      active={route.view === "games" || route.view === "swipemaths"} onClick={() => navigate({ view: "games" })} />
           {editorMode && (
             <DeskNavItem icon={Activity} label="Activity" active={route.view === "activity"} onClick={() => navigate({ view: "activity" })} />
@@ -933,6 +938,10 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
               canTeach={teachMode}
               onUnlockRequest={() => setIsLoginOpen(true)}
             />
+          )}
+
+          {route.view === "exams" && (
+            <ExamChecker students={state.students} canTeach={teachMode} onUnlockRequest={() => setIsLoginOpen(true)} />
           )}
 
           {route.view === "attendance" && (
