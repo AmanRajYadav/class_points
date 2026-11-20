@@ -40,7 +40,7 @@ const TILES: Tile[] = [
   {
     view: "homework",
     label: "Homework",
-    hint: "Bhejo, point apne aap. Sir: kisne bheja, kisne nahi",
+    hint: "Scan and send. Teachers: who sent, who did not",
     icon: FileUp,
     tint: "bg-rose-50 text-rose-600 border-rose-100",
   },

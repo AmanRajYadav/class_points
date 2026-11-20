@@ -103,7 +103,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
-              placeholder="Apna naam (username)"
+              placeholder="Your name (username)"
               value={identifier}
               onChange={(e) => {
                 setError(null);
@@ -122,7 +122,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <input
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
-                placeholder="Password (sirf Sir / staff)"
+                placeholder="Password (teachers only)"
                 value={password}
                 onChange={(e) => {
                   setError(null);
@@ -169,7 +169,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
           </form>
 
           <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
-            Students: bas apna naam likho aur Sign in dabao. Staff: naam aur password. What anyone can edit is
+            Students: just type your name and press Sign in. Teachers: name and password. What anyone can edit is
             enforced by the database, not this screen.
           </p>
         </div>

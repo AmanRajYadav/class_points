@@ -80,10 +80,10 @@ export const currentRun = (marks: { mark: DayMark }[]): number => {
 };
 
 const FACE: Record<DayMark, { icon: string; label: string; cls: string }> = {
-  ontime: { icon: "👑", label: "Time par", cls: "bg-amber-50 border-amber-200" },
+  ontime: { icon: "👑", label: "On time", cls: "bg-amber-50 border-amber-200" },
   late: { icon: "🐢", label: "Late", cls: "bg-orange-50 border-orange-200" },
-  miss: { icon: "😴", label: "Nahi bheja", cls: "bg-slate-100 border-slate-200 grayscale" },
-  open: { icon: "·", label: "Aaj baaki hai", cls: "bg-white border-dashed border-slate-200 text-slate-300" },
+  miss: { icon: "😴", label: "Not sent", cls: "bg-slate-100 border-slate-200 grayscale" },
+  open: { icon: "·", label: "Still open", cls: "bg-white border-dashed border-slate-200 text-slate-300" },
 };
 
 const dayLetter = (iso: string) =>
@@ -108,20 +108,20 @@ export const HomeworkWall: React.FC<{
   highlightId?: string | null;
 }> = ({ students, points, highlightId }) => {
   const wall = useHomeworkWall();
-  const branches: Student["branch"][] = ["Sarkanda", "Mangla"];
+  const branches: string[] = ["Sarkanda", "Mangla", "Personal"];
 
   return (
     <div className="bg-white rounded-3xl border border-slate-200/80 p-4 space-y-4">
       <div>
         <h2 className="text-xl font-black text-slate-900 leading-tight">Homework Wall</h2>
         <p className="text-xs text-slate-400 font-semibold mt-0.5">
-          👑 time par bheja · 🐢 late bheja · 😴 nahi bheja · 3 din lagataar 👑 = +200
+          👑 on time · 🐢 late · 😴 not sent · 3 days in a row 👑 = +200
         </p>
       </div>
 
       {branches.map((branch) => {
         const list = students
-          .filter((s) => s.branch === branch)
+          .filter((s) => (s.branch as string) === branch)
           .map((s) => {
             const marks = marksFor(s.id, wall, points);
             return { s, marks, run: currentRun(marks), done: marks.filter((m) => m.mark === "ontime").length };
@@ -142,7 +142,7 @@ export const HomeworkWall: React.FC<{
                         {s.name}
                       </p>
                       <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        {run >= 3 ? `${run} din lagataar · King` : run > 0 ? `${run} din lagataar` : lastTwoMissed ? "Homework so raha hai" : "Aaj se shuru karo"}
+                        {run >= 3 ? `${run} days in a row · King` : run > 0 ? `${run} day${run > 1 ? "s" : ""} in a row` : lastTwoMissed ? "Homework is sleeping" : "Start today"}
                       </p>
                     </div>
                     <HomeworkStrip marks={marks} />

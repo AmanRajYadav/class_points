@@ -221,10 +221,10 @@ export async function signInByName(username: string): Promise<string | null> {
     body: { username: normaliseUsername(username) },
   });
   if (error || !data?.token_hash) {
-    return "Is naam ka student login nahi mila. Spelling dekho, ya Sir se poochho.";
+    return "No student login with this name. Check the spelling, or ask Sir.";
   }
   const { error: failed } = await supabase.auth.verifyOtp({ token_hash: data.token_hash, type: "magiclink" });
-  return failed ? "Login nahi ho paya. Ek baar phir try karo." : null;
+  return failed ? "Could not sign in. Please try once more." : null;
 }
 
 export async function signOut(): Promise<void> {
