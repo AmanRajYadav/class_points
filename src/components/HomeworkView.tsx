@@ -126,6 +126,14 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [mine, setMine] = useState<Submission[]>([]);
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
+
+  // Pages add up; taking another photo never throws the earlier ones away.
+  const addPages = (files: File[]) => {
+    if (files.length) setPicked((list) => [...list, ...files].slice(0, 20));
+    if (camera.current) camera.current.value = "";
+    if (input.current) input.current.value = "";
+  };
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -228,24 +236,57 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
           </div>
         )}
 
+        {/* The camera opens straight away; every photo taken is one more page.
+            Nobody has to make a PDF or find a file: point, click, repeat, send. */}
+        <input
+          ref={camera}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => addPages(Array.from(e.target.files ?? []))}
+        />
         <input
           ref={input}
           type="file"
           accept="image/*,application/pdf"
           multiple
           className="hidden"
-          onChange={(e) => setPicked(Array.from(e.target.files ?? []).slice(0, 20))}
+          onChange={(e) => addPages(Array.from(e.target.files ?? []))}
         />
+        <button
+          onClick={() => camera.current?.click()}
+          disabled={Boolean(busy)}
+          className="w-full rounded-2xl bg-slate-900 text-white py-5 flex flex-col items-center gap-1 cursor-pointer active:scale-[0.99] transition-transform"
+        >
+          <Camera className="w-7 h-7" />
+          <span className="text-base font-black">
+            {picked.length ? "Agle page ki photo lo" : "Copy ke page ki photo lo"}
+          </span>
+          <span className="text-[11px] font-semibold text-slate-300">Har page ke liye ek baar dabao</span>
+        </button>
+
+        {picked.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {picked.map((file, index) => (
+              <button
+                key={index}
+                onClick={() => setPicked((list) => list.filter((_, k) => k !== index))}
+                title="Hatao"
+                className="text-xs font-black px-2.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 cursor-pointer"
+              >
+                {file.type === "application/pdf" ? "PDF" : `Page ${index + 1}`} ✕
+              </button>
+            ))}
+          </div>
+        )}
+
         <button
           onClick={() => input.current?.click()}
           disabled={Boolean(busy)}
-          className="w-full rounded-2xl border-2 border-dashed border-slate-300 py-6 flex flex-col items-center gap-1.5 text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors cursor-pointer"
+          className="w-full text-xs font-bold text-slate-400 underline underline-offset-2 cursor-pointer"
         >
-          <Camera className="w-6 h-6" />
-          <span className="text-sm font-black">
-            {picked.length ? `${picked.length} page chune gaye` : "Photos ya PDF chuno"}
-          </span>
-          <span className="text-[11px] font-semibold text-slate-400">Saare page ek saath chun sakte ho</span>
+          Photos pehle se kheenche hain, ya PDF hai? Yahan se chuno
         </button>
 
         <button
@@ -254,7 +295,7 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
           className="w-full rounded-2xl bg-indigo-600 text-white font-black py-3.5 flex items-center justify-center gap-2 disabled:bg-slate-200 disabled:text-slate-400 cursor-pointer disabled:cursor-default"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          {busy || "Sir ko bhejo"}
+          {busy || (picked.length ? `${picked.length} page Sir ko bhejo` : "Sir ko bhejo")}
         </button>
 
         {message && (
@@ -387,7 +428,7 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
     if (!ai || ai.error) return void recheck(row);
     const lines = (ai.questions ?? [])
       .filter((q) => q.verdict !== "right")
-      .map((q) => `Q${q.n}: ${q.verdict === "not_attempted" ? "chhoda" : q.verdict === "wrong" ? "galat" : "padha nahi gaya"}${q.mistake ? " - " + q.mistake : ""}${q.cause && q.cause !== "none" ? " (" + q.cause + ")" : ""}`);
+      .map((q) => `Q${q.n}: ${q.verdict === "not_attempted" ? "chhoda" : q.verdict === "wrong" ? "galat" : q.verdict === "different_question" ? "doosri list ka sawal" : "padha nahi gaya"}${q.mistake ? " - " + q.mistake : ""}${q.cause && q.cause !== "none" ? " (" + q.cause + ")" : ""}`);
     const text = [`${student.name}: ${ai.summary ?? ""}`, ai.reason ?? "", ...lines, ai.for_teacher ? "Aage: " + ai.for_teacher : "", "(AI ki padhai hai; likhawat galat bhi padh sakta hai.)"]
       .filter(Boolean)
       .join(String.fromCharCode(10));
@@ -433,10 +474,10 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
                 const row = byStudent.get(student.id);
                 const noLogin = logins !== null && !logins.has(student.id);
                 return (
-                  <div key={student.id} className="py-2.5 flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
+                  <div key={student.id} className="py-2.5 flex flex-wrap items-center gap-2">
+                    <div className="basis-full sm:basis-0 sm:flex-1 min-w-0">
                       <p className="font-black text-slate-800 text-sm truncate">{student.name}</p>
-                      <p className="text-[11px] font-semibold text-slate-400 truncate">
+                      <p className="text-[11px] font-semibold text-slate-400">
                         {row
                           ? `${row.files.length} page · ${niceTime(row.submitted_at)}${row.ai?.summary ? ` · ${row.ai.summary}` : ""}`
                           : noLogin
