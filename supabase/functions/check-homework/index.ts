@@ -47,12 +47,15 @@ const SCHEMA = {
           attempted: { type: "BOOLEAN" },
           verdict: { type: "STRING", enum: ["right", "wrong", "unclear", "not_attempted"] },
           note: { type: "STRING" },
+          mistake: { type: "STRING" },
+          cause: { type: "STRING", enum: ["none", "concept", "formula", "calculation", "diagram", "reading_the_question", "incomplete", "copied_answer_only", "cannot_tell"] },
         },
         required: ["n", "attempted", "verdict"],
       },
     },
     needs_review: { type: "BOOLEAN" },
     reason: { type: "STRING" },
+    for_teacher: { type: "STRING" },
   },
   required: ["readable", "blank_or_unrelated", "handwritten", "looks_machine_made", "questions", "needs_review", "reason"],
 };
@@ -104,6 +107,9 @@ Deno.serve(async (req) => {
     }
     if (parts.length === 0) return json({ error: "no_pages" }, 422);
 
+    const n = questions.length;
+    const minAttempted = Math.ceil(Math.max(n, 1) * 0.7);
+    const maxDoubt = Math.max(2, Math.ceil(n * 0.3));
     const list = questions.length
       ? questions.map(([q, a], i) => `Q${i + 1}. ${q}\n   Teacher's answer: ${a}`).join("\n")
       : "(The question list for this day is not available. Judge only whether real handwritten maths work is present, and return an empty questions array.)";
@@ -115,8 +121,9 @@ ${list}
 
 For each question decide: was it attempted, and does the student's FINAL answer agree with the teacher's answer (equal value counts: 17.32 and 10√3 agree). Use "unclear" whenever you cannot read the work or cannot find that question. Never guess "right".
 Also decide: are the pages readable; are they blank or unrelated to this homework; is it handwritten; does it look machine-made (typed, printed, or copied text from an AI tool instead of the student's own handwriting and working).
-Set needs_review to true if anything is unreadable, blank, unrelated, machine-made, if fewer than 7 questions are attempted, or if 3 or more verdicts are "wrong" or "unclear". Otherwise false.
-In "reason" write one short plain sentence for the teacher. Notes are at most 12 words each.`;
+Set needs_review to true if anything is unreadable, blank, unrelated, machine-made, if fewer than ${minAttempted} of the ${n} questions are attempted, or if ${maxDoubt} or more verdicts are "wrong" or "unclear". Otherwise false.
+For every question that is wrong or left incomplete, fill "mistake" with the exact step where it went wrong, in at most 25 plain words (for example: "took tan 30 as root 3", "did not rationalise", "stopped after the diagram"), and "cause" with the best single reason; for a right answer use cause "none". If only the final answer is written with no working, use "copied_answer_only".
+In "for_teacher" write two or three plain sentences: what this student should be taught or made to practise next, naming the kind of question. In "reason" write one short plain sentence. Notes are at most 12 words each.`;
 
     // Google renames its models every few months, so unless GEMINI_MODEL names
     // one, ask the key what it can use and take the newest plain Flash model
