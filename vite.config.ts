@@ -9,8 +9,10 @@ export default defineConfig(() => {
     // needs that prefix. Applied in dev and preview too, not just builds: if
     // this only took effect for `build`, the dev server would serve from `/`
     // and quietly hide every path bug until it reached production.
-    // Override with BASE_PATH=/ for a custom domain or a root-hosted deploy.
-    base: process.env.BASE_PATH ?? '/class_points/',
+    // Relative since 21 Nov 2026, so the same build works at
+    // <user>.github.io/<repo>/ and at the root of a custom domain. The app
+    // routes with the hash, so the page itself never leaves its folder.
+    base: process.env.BASE_PATH ?? './',
     // Stamped into the bundle so the app can tell the user which build they are
     // actually running. Without it, "it's showing the old version" is a report
     // nobody can confirm or deny.

@@ -58,8 +58,8 @@ jobs:
           # either way, and row level security is what protects the data.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          # Serve from https://<user>.github.io/<repo>/
-          BASE_PATH: /${{ github.event.repository.name }}/
+          # Relative paths: the same build works under /<repo>/ and on a custom domain.
+          BASE_PATH: ./
         run: npm run build
 
       # Confirms Vite actually inlined the values, rather than the build

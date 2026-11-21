@@ -69,7 +69,7 @@ export async function forceRefresh(): Promise<void> {
     // server — handing back HTML that names the previous bundle hash. Fetching
     // with `cache: "reload"` forces a real download and overwrites that entry,
     // so the reload below picks up the new document.
-    await fetch(new URL(import.meta.env.BASE_URL, window.location.origin).href, {
+    await fetch(new URL(import.meta.env.BASE_URL, window.location.href).href, {
       cache: "reload",
     });
   } catch (err) {
