@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { Camera, Check, Clock, FileText, Loader2, ScanLine, Sparkles, Upload, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { DailyPoint, Student } from "../types";
@@ -139,12 +140,75 @@ const Pill: React.FC<{ status: Status }> = ({ status }) => (
   </span>
 );
 
-async function openFiles(paths: string[]) {
-  // Opened one by one in new tabs; a signed link lasts ten minutes.
-  for (const path of paths) {
-    const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, 600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
-  }
+/**
+ * Every page of one homework, one under the other, inside the app.
+ *
+ * The first version opened each page in a new tab. A phone allows one new tab
+ * per tap and silently blocks the rest, so four pages looked like one
+ * (Aman, 21 Nov 2026). Nothing leaves the app now.
+ */
+const PagesViewer: React.FC<{ paths: string[]; onClose: () => void }> = ({ paths, onClose }) => {
+  const [urls, setUrls] = useState<(string | null)[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 3600);
+      if (alive) setUrls(paths.map((_, i) => data?.[i]?.signedUrl ?? null));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [paths]);
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-900 flex flex-col" role="dialog" aria-label="Homework pages">
+      <div
+        className="flex items-center justify-between gap-3 px-3 pb-2 text-white"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}
+      >
+        <p className="text-sm font-black pl-1">{paths.length} page{paths.length > 1 ? "s" : ""}</p>
+        <button onClick={onClose} className="flex items-center gap-1.5 text-sm font-black px-4 h-11 rounded-full bg-white/15 cursor-pointer">
+          <X className="w-4 h-4" /> Close
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 space-y-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
+        {!urls && (
+          <div className="py-20 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-white/70" /></div>
+        )}
+        {urls?.map((url, i) => (
+          <div key={paths[i]} className="max-w-2xl mx-auto">
+            <p className="text-[11px] font-black text-white/60 mb-1">Page {i + 1} of {paths.length}</p>
+            {!url ? (
+              <p className="rounded-xl bg-white/10 text-white/70 text-sm font-bold p-4">This page could not be opened.</p>
+            ) : paths[i].toLowerCase().endsWith(".pdf") ? (
+              <a href={url} target="_blank" rel="noopener" className="flex items-center gap-2 rounded-xl bg-white text-slate-900 text-sm font-black p-4">
+                <FileText className="w-5 h-5" /> Open the PDF
+              </a>
+            ) : (
+              <img src={url} alt={`Page ${i + 1}`} className="w-full rounded-xl bg-white" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+function openFiles(paths: string[]) {
+  if (!paths.length) return;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  root.render(
+    <PagesViewer
+      paths={paths}
+      onClose={() => {
+        root.unmount();
+        host.remove();
+      }}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------

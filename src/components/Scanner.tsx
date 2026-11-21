@@ -26,10 +26,9 @@ import {
  *  - The camera stays on. Each tap of the shutter adds a page to the strip at
  *    the bottom; nothing is sent until "Done".
  *  - Every page in the strip has a cross. It asks before deleting.
- *  - Tapping a page opens it: Clean / B&W / Original, rotate, crop.
- *  - The page of paper is found and straightened automatically when it is
- *    clearly visible; otherwise the whole picture is kept. Crop always has
- *    "Whole photo", so a wrong guess never costs the student their working.
+ *  - Tapping a page opens it: rotate, crop, brighten.
+ *  - The photo is sent as it was taken. Nothing is straightened or cleaned
+ *    unless he asks for it on the page ("Find the page" inside Crop).
  *
  * If the browser will not give a live camera (permission refused, an old
  * phone), the same screen works with the phone's own camera, one photo at a
@@ -54,10 +53,13 @@ interface Props {
 
 const SOURCE_SIDE = 2000;
 const SEND_SIDE = 1500;
+// Only inside an opened page, for a photo that came out dark. Nothing is
+// applied on its own: Aman found (21 Nov 2026) that the automatic straightening
+// and cleaning spoiled photos that were good as taken.
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "clean", label: "Clean" },
-  { id: "bw", label: "B&W" },
-  { id: "original", label: "Original" },
+  { id: "original", label: "As taken" },
+  { id: "clean", label: "Brighter" },
+  { id: "bw", label: "Black & white" },
 ];
 
 // The installed app on an iPhone draws under the status bar and over the home
@@ -223,7 +225,7 @@ const PageView: React.FC<{
             <button
               key={f.id}
               onClick={() => onChange({ filter: f.id })}
-              className={`text-sm font-black px-4 py-2.5 rounded-xl cursor-pointer ${
+              className={`text-sm font-black px-3 py-2.5 rounded-xl cursor-pointer whitespace-nowrap ${
                 page.filter === f.id ? "bg-white text-slate-900" : "bg-white/10 text-white"
               }`}
             >
@@ -260,16 +262,12 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
   const [working, setWorking] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [flash, setFlash] = useState(false);
-  const [filter, setFilter] = useState<Filter>("clean");
 
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const nativeCamera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
   const strip = useRef<HTMLDivElement>(null);
-  // Read by async work that started before a re-render.
-  const filterNow = useRef<Filter>(filter);
-  filterNow.current = filter;
 
   const stopCamera = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop());
@@ -323,8 +321,8 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
     setWorking((n) => n + 1);
     try {
       const source = await canvasToBlob(canvas, 0.9);
-      const found = detectPage(canvas);
-      const settings: PageSettings = { rotation: 0, quad: found ?? FULL, filter: filterNow.current };
+      // Kept exactly as taken. Crop, rotate and brighten are there if he opens the page.
+      const settings: PageSettings = { rotation: 0, quad: FULL, filter: "original" };
       const thumb = await thumbOf(source, settings);
       setPages((list) => (list.length >= max ? list : [...list, { id: newId(), source, thumb, ...settings }]));
       window.setTimeout(() => strip.current?.scrollTo({ left: strip.current.scrollWidth, behavior: "smooth" }), 60);
@@ -459,17 +457,6 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
             {full ? `Limit of ${max} pages reached` : "Keep the whole page inside"}
           </p>
         )}
-        <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`text-xs font-black px-3.5 py-2 rounded-full cursor-pointer ${filter === f.id ? "bg-white text-slate-900" : "bg-black/55 text-white"}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* The strip: every page taken so far */}
