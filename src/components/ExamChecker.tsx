@@ -275,7 +275,7 @@ const SheetReview: React.FC<{
 
   return createPortal(
     <div className="fixed inset-0 z-[60] bg-slate-100 flex flex-col" role="dialog" aria-label={`Answer sheet of ${student.name}`}>
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+      <div className="bg-white border-b border-slate-200 px-4 pb-3 flex items-center gap-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
         <button onClick={close} className="p-2.5 rounded-xl bg-slate-100 text-slate-600 cursor-pointer"><ArrowLeft className="w-5 h-5" /></button>
         <div className="flex-1 min-w-0">
           <p className="font-black text-slate-900 text-base leading-tight">{student.name}</p>
@@ -352,7 +352,7 @@ const SheetReview: React.FC<{
         <p className="text-[11px] text-slate-400 font-semibold px-1 pb-2">The AI proposes marks from the photos and can misread handwriting. The marks that count are the ones you save here.</p>
       </div>
 
-      <div className="bg-white border-t border-slate-200 px-3 py-3 flex gap-2 max-w-2xl w-full mx-auto">
+      <div className="bg-white border-t border-slate-200 px-3 pt-3 flex gap-2 max-w-2xl w-full mx-auto" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}>
         <button onClick={() => void save(false)} disabled={saving} className={`${ghost} flex-1 justify-center py-3`}>Save</button>
         <button onClick={() => void save(true)} disabled={saving} className={`${dark} flex-[2]`}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

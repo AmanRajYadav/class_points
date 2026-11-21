@@ -14,7 +14,6 @@ import {
   isFull,
   renderPage,
   rotate,
-  toCanvas,
 } from "../lib/scan";
 
 /**
@@ -60,6 +59,12 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "bw", label: "B&W" },
   { id: "original", label: "Original" },
 ];
+
+// The installed app on an iPhone draws under the status bar and over the home
+// bar (index.html asks for the whole screen). Without these, the top buttons sit
+// under the clock and cannot be tapped. Found by Aman on his phone, 21 Nov 2026.
+const SAFE_TOP: React.CSSProperties = { paddingTop: "env(safe-area-inset-top, 0px)" };
+const SAFE_BOTTOM: React.CSSProperties = { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" };
 
 let counter = 0;
 const newId = () => `p${Date.now()}_${counter++}`;
@@ -109,7 +114,7 @@ const CropView: React.FC<{
   const points = quad.map((p) => `${p.x * 100},${p.y * 100}`).join(" ");
 
   return (
-    <div className="absolute inset-0 bg-black flex flex-col">
+    <div className="absolute inset-0 bg-black flex flex-col" style={SAFE_TOP}>
       <div className="flex items-center justify-between px-4 py-3 text-white">
         <button onClick={onCancel} className="text-sm font-bold px-3 py-2 cursor-pointer">Cancel</button>
         <p className="text-sm font-black">Drag the corners to the page</p>
@@ -124,7 +129,7 @@ const CropView: React.FC<{
             onPointerUp={() => (drag.current = null)}
             onPointerCancel={() => (drag.current = null)}
           >
-            <img src={url} alt="" draggable={false} className="block max-h-[68vh] max-w-full" />
+            <img src={url} alt="" draggable={false} className="block max-h-[60vh] max-w-full" />
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none">
               <polygon points={points} fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
             </svg>
@@ -144,7 +149,7 @@ const CropView: React.FC<{
           <Loader2 className="w-7 h-7 text-white animate-spin" />
         )}
       </div>
-      <div className="flex items-center justify-center gap-3 px-4 pb-6">
+      <div className="flex items-center justify-center gap-3 px-4 pt-2" style={SAFE_BOTTOM}>
         <button onClick={() => setQuad(FULL)} className="text-sm font-bold px-4 py-2.5 rounded-xl bg-white/10 text-white cursor-pointer">Whole photo</button>
         <button
           onClick={() => auto && setQuad(auto)}
@@ -200,7 +205,7 @@ const PageView: React.FC<{
   }
 
   return (
-    <div className="absolute inset-0 bg-black flex flex-col">
+    <div className="absolute inset-0 bg-black flex flex-col" style={SAFE_TOP}>
       <div className="flex items-center justify-between px-4 py-3 text-white">
         <button onClick={onBack} className="text-sm font-black px-4 py-2 rounded-xl bg-white/10 cursor-pointer">Back</button>
         <p className="text-sm font-black">Page {number} of {total}</p>
@@ -212,7 +217,7 @@ const PageView: React.FC<{
         <img src={url} alt={`Page ${number}`} className="max-h-full max-w-full rounded-lg bg-white" />
         {busy && <Loader2 className="absolute w-7 h-7 text-white animate-spin" />}
       </div>
-      <div className="px-4 pb-6 space-y-3">
+      <div className="px-4 pt-2 space-y-3" style={SAFE_BOTTOM}>
         <div className="flex justify-center gap-2">
           {FILTERS.map((f) => (
             <button
@@ -331,7 +336,23 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
   const shoot = () => {
     const v = video.current;
     if (!v || !v.videoWidth || pages.length + working >= max) return;
-    const frame = toCanvas(v, v.videoWidth, v.videoHeight, SOURCE_SIDE);
+    // The preview fills its box and hides what does not fit, so keep only the
+    // part that was on screen: what the student saw is what is scanned.
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+    const cw = v.clientWidth || vw;
+    const ch = v.clientHeight || vh;
+    const shown = Math.max(cw / vw, ch / vh);
+    const sw = Math.min(vw, cw / shown);
+    const sh = Math.min(vh, ch / shown);
+    const fit = Math.min(1, SOURCE_SIDE / Math.max(sw, sh));
+    const frame = document.createElement("canvas");
+    frame.width = Math.max(1, Math.round(sw * fit));
+    frame.height = Math.max(1, Math.round(sh * fit));
+    const g = frame.getContext("2d");
+    if (!g) return;
+    g.imageSmoothingQuality = "high";
+    g.drawImage(v, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, frame.width, frame.height);
     setFlash(true);
     window.setTimeout(() => setFlash(false), 120);
     if (navigator.vibrate) navigator.vibrate(20);
@@ -394,37 +415,37 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
   if (!open) return null;
 
   const openPage = pages.find((p) => p.id === openId);
-  const full = pages.length + working >= max;
+  const count = pages.length + working;
+  const full = count >= max;
 
   // Rendered on <body>, not where it is used: the screens of this app sit inside
   // animated containers, and a "fixed" box inside a transformed parent is fixed
   // to that parent, not to the phone. Found in testing: the scanner opened
   // somewhere down the page, out of sight.
   return createPortal(
-    <div className="fixed inset-0 z-[70] bg-black text-white flex flex-col" role="dialog" aria-label="Scan homework">
+    <div className="fixed inset-0 z-[70] bg-black text-white flex flex-col" style={SAFE_TOP} role="dialog" aria-label="Scan homework">
       <input ref={nativeCamera} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => void addFiles(Array.from(e.target.files ?? []))} />
       <input ref={gallery} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void addFiles(Array.from(e.target.files ?? []))} />
 
-      {/* Top bar */}
-      <div className="flex items-center justify-between gap-2 px-3 py-3">
-        <button onClick={close} className="p-2.5 rounded-xl bg-white/10 cursor-pointer" title="Close"><X className="w-5 h-5" /></button>
-        <p className="text-sm font-black truncate">{title}</p>
-        <button
-          onClick={() => void finish()}
-          disabled={!pages.length || working > 0 || finishing}
-          className="flex items-center gap-1.5 text-sm font-black px-4 py-2.5 rounded-xl bg-emerald-500 disabled:bg-white/10 disabled:text-white/40 cursor-pointer disabled:cursor-default"
-        >
-          {finishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          Done{pages.length ? ` (${pages.length})` : ""}
+      {/* Top bar: only close and the name. Done is at the bottom, under the thumb. */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button onClick={close} className="w-11 h-11 shrink-0 rounded-full bg-white/10 flex items-center justify-center cursor-pointer" aria-label="Close">
+          <X className="w-5 h-5" />
         </button>
+        <p className="flex-1 min-w-0 text-center text-sm font-black truncate">{title}</p>
+        <p className="w-11 shrink-0 text-center text-xs font-black text-white/60">{count}/{max}</p>
       </div>
 
-      {/* Camera */}
-      <div className="flex-1 min-h-0 relative flex items-center justify-center overflow-hidden">
-        <video ref={video} playsInline muted autoPlay className={`max-h-full max-w-full ${live === "on" ? "" : "hidden"}`} />
-        {live === "starting" && <Loader2 className="w-8 h-8 animate-spin text-white/70" />}
+      {/* Camera: edge to edge */}
+      <div className="flex-1 min-h-0 relative overflow-hidden bg-neutral-900">
+        <video ref={video} playsInline muted autoPlay className={`absolute inset-0 w-full h-full object-cover ${live === "on" ? "" : "hidden"}`} />
+        {live === "starting" && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-white/70" />
+          </div>
+        )}
         {live === "off" && (
-          <div className="text-center px-8 space-y-3">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 gap-3">
             <p className="text-sm font-bold text-white/80">The camera did not open here.</p>
             <p className="text-xs text-white/50">Allow the camera for this site, or use the button below. Each photo is added as a page.</p>
             <button onClick={() => nativeCamera.current?.click()} disabled={full} className="text-sm font-black px-5 py-3 rounded-2xl bg-white text-slate-900 cursor-pointer">
@@ -434,66 +455,76 @@ export const Scanner: React.FC<Props> = ({ open, title, max = 20, onClose, onDon
         )}
         {flash && <div className="absolute inset-0 bg-white/80 pointer-events-none" />}
         {live === "on" && (
-          <p className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] font-bold bg-black/50 px-3 py-1 rounded-full whitespace-nowrap">
-            Keep the whole page inside · {pages.length + working} page{pages.length + working === 1 ? "" : "s"}
+          <p className="absolute top-3 left-1/2 -translate-x-1/2 text-[11px] font-bold bg-black/55 px-3 py-1 rounded-full whitespace-nowrap pointer-events-none">
+            {full ? `Limit of ${max} pages reached` : "Keep the whole page inside"}
           </p>
         )}
+        <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`text-xs font-black px-3.5 py-2 rounded-full cursor-pointer ${filter === f.id ? "bg-white text-slate-900" : "bg-black/55 text-white"}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* The strip: every page taken so far */}
-      <div ref={strip} className="flex gap-2 overflow-x-auto px-3 py-2 min-h-[92px] items-center">
-        {pages.length === 0 && working === 0 && (
+      <div ref={strip} className="flex gap-2.5 overflow-x-auto px-3 pt-3 pb-1 h-[84px] shrink-0 items-center">
+        {count === 0 && (
           <p className="text-xs text-white/40 font-semibold w-full text-center">Pages you scan appear here. Tap one to fix it.</p>
         )}
         {pages.map((p, i) => (
           <div key={p.id} className="relative shrink-0">
-            <button onClick={() => setOpenId(p.id)} className="block cursor-pointer" title={`Open page ${i + 1}`}>
-              <img src={p.thumb} alt={`Page ${i + 1}`} className="h-[76px] w-[58px] object-cover rounded-lg border-2 border-white/30 bg-white" />
+            <button onClick={() => setOpenId(p.id)} className="block cursor-pointer" aria-label={`Open page ${i + 1}`}>
+              <img src={p.thumb} alt={`Page ${i + 1}`} className="h-[64px] w-[48px] object-cover rounded-md border-2 border-white/40 bg-white" />
               <span className="absolute bottom-1 left-1 text-[10px] font-black bg-black/70 rounded px-1">{i + 1}</span>
             </button>
             <button
               onClick={() => remove(p.id)}
-              title={`Delete page ${i + 1}`}
-              className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center shadow cursor-pointer"
+              aria-label={`Delete page ${i + 1}`}
+              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center shadow cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}
         {working > 0 && (
-          <div className="shrink-0 h-[76px] w-[58px] rounded-lg border-2 border-dashed border-white/30 flex items-center justify-center">
+          <div className="shrink-0 h-[64px] w-[48px] rounded-md border-2 border-dashed border-white/30 flex items-center justify-center">
             <Loader2 className="w-5 h-5 animate-spin text-white/70" />
           </div>
         )}
       </div>
 
-      {/* Controls */}
-      <div className="px-4 pb-6 pt-1 space-y-3">
-        <div className="flex justify-center gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`text-xs font-black px-3 py-1.5 rounded-full cursor-pointer ${filter === f.id ? "bg-white text-slate-900" : "bg-white/10 text-white/80"}`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center justify-between">
-          <button onClick={() => gallery.current?.click()} disabled={full} className="flex flex-col items-center gap-1 w-20 text-[10px] font-bold text-white/70 cursor-pointer">
-            <Images className="w-6 h-6" /> Gallery
-          </button>
-          <button
-            onClick={live === "on" ? shoot : () => nativeCamera.current?.click()}
-            disabled={full || live === "starting"}
-            aria-label="Scan a page"
-            className="w-[74px] h-[74px] rounded-full border-4 border-white flex items-center justify-center disabled:opacity-40 cursor-pointer active:scale-95 transition-transform"
-          >
-            <span className="w-[58px] h-[58px] rounded-full bg-white" />
-          </button>
-          <div className="w-20 text-center text-[10px] font-bold text-white/50">{full ? `Limit ${max}` : "One tap = one page"}</div>
-        </div>
+      {/* Controls: gallery, shutter, Done */}
+      <div className="grid grid-cols-3 items-center px-4 pt-2 shrink-0" style={SAFE_BOTTOM}>
+        <button
+          onClick={() => gallery.current?.click()}
+          disabled={full}
+          className="justify-self-start flex flex-col items-center gap-1 min-w-[64px] py-1 text-[11px] font-bold text-white/80 disabled:opacity-40 cursor-pointer"
+        >
+          <span className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center"><Images className="w-6 h-6" /></span>
+          Gallery
+        </button>
+        <button
+          onClick={live === "on" ? shoot : () => nativeCamera.current?.click()}
+          disabled={full || live === "starting"}
+          aria-label="Scan a page"
+          className="justify-self-center w-[76px] h-[76px] rounded-full border-4 border-white flex items-center justify-center disabled:opacity-40 cursor-pointer active:scale-95 transition-transform"
+        >
+          <span className="w-[60px] h-[60px] rounded-full bg-white" />
+        </button>
+        <button
+          onClick={() => void finish()}
+          disabled={!pages.length || working > 0 || finishing}
+          className="justify-self-end flex items-center justify-center gap-1.5 min-w-[104px] h-[52px] px-3 rounded-2xl text-[15px] whitespace-nowrap font-black bg-emerald-500 disabled:bg-white/10 disabled:text-white/40 cursor-pointer disabled:cursor-default active:scale-95 transition-transform"
+        >
+          {finishing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+          Done{pages.length ? ` (${pages.length})` : ""}
+        </button>
       </div>
 
       {openPage && (
