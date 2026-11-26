@@ -17,7 +17,7 @@ interface StudentRow {
   id: string;
   name: string;
   avatar_id: number;
-  branch: "Mangla" | "Sarkanda";
+  branch: "Mangla" | "Sarkanda" | "Personal";
   created_at: string;
 }
 
@@ -38,7 +38,7 @@ interface TrophyWinnerRow {
   student_name: string;
   avatar_id: number;
   score: number;
-  branch: "Mangla" | "Sarkanda";
+  branch: "Mangla" | "Sarkanda" | "Personal";
   cycle_start_date: string;
   cycle_end_date: string;
   awarded_at: string;
@@ -148,8 +148,19 @@ export class SchemaMissingError extends Error {
 
 const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205", "PGRST106"]);
 
+/** A write the server answered and refused (bad row, unique clash): retrying the
+ *  exact same request will not help, unlike a dropped connection. */
+export class ServerRejectedError extends Error {
+  code: string;
+  constructor(message: string, code: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 const raise = (error: PostgrestError): never => {
   if (MISSING_TABLE_CODES.has(error.code)) throw new SchemaMissingError();
+  if (error.code) throw new ServerRejectedError(error.message, error.code);
   throw new Error(error.message);
 };
 
@@ -234,7 +245,10 @@ export async function applyWriteOp(op: WriteOp): Promise<void> {
     case "upsertPoint": {
       const { error } = await supabase
         .from("daily_points")
-        .upsert({ ...fromDailyPoint(op.point), updated_at: new Date().toISOString() });
+        // Keyed on (student, day), the row's real identity. The database also
+        // writes this table (homework uploads, streaks) and attendance from it,
+        // and a clash on that key used to come back as 409 and jam the queue.
+        .upsert({ ...fromDailyPoint(op.point), updated_at: new Date().toISOString() }, { onConflict: "student_id,date" });
       if (error) raise(error);
       return;
     }
@@ -283,7 +297,7 @@ export async function applyWriteOp(op: WriteOp): Promise<void> {
       }
       const pointRows = Object.values(points).map(fromDailyPoint);
       if (pointRows.length > 0) {
-        const { error } = await supabase.from("daily_points").upsert(pointRows);
+        const { error } = await supabase.from("daily_points").upsert(pointRows, { onConflict: "student_id,date" });
         if (error) raise(error);
       }
       if (history.length > 0) {

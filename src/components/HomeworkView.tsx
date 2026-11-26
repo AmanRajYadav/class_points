@@ -220,7 +220,7 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
   // Before 4 pm, yesterday's homework is still on time and is what most are sending.
   const stillOpen = istHour() < 16;
   const [hwDate, setHwDate] = useState(stillOpen ? yesterday : today);
-  const [task, setTask] = useState<{ title: string; questions: string[] } | null>(null);
+  const [task, setTask] = useState<{ title: string; questions: string[]; science?: string[] } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -309,15 +309,34 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
         </div>
 
         {task && (
-          <div className="rounded-2xl bg-amber-50/60 border border-amber-100 px-3 py-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1.5">
-              {task.title || "Homework"} · your {task.questions.length} questions
-            </p>
-            <ol className="list-decimal pl-5 space-y-1.5 text-[13px] leading-snug text-slate-700 font-medium">
-              {task.questions.map((q, i) => (
-                <li key={i}>{plain(q)}</li>
-              ))}
-            </ol>
+          <div className="rounded-2xl bg-amber-50/60 border border-amber-100 px-3 py-3 space-y-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1.5">
+                {task.title || "Homework"} · Maths · {task.questions.length} questions
+              </p>
+              <ol className="list-decimal pl-5 space-y-1.5 text-[13px] leading-snug text-slate-700 font-medium">
+                {task.questions.map((q, i) => (
+                  <li key={i}>{plain(q)}</li>
+                ))}
+              </ol>
+            </div>
+            {task.science && task.science.length > 0 && (
+              <div className="pt-2 border-t border-amber-100">
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700 mb-1.5">
+                  Science · {task.science.length} questions
+                </p>
+                <ol className="list-decimal pl-5 space-y-1.5 text-[13px] leading-snug text-slate-700 font-medium">
+                  {task.science.map((q, i) => (
+                    <li key={i}>{plain(q)}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {task.science && task.science.length > 0 && (
+              <p className="text-[11px] font-semibold text-slate-500">
+                One PDF: write the heading Maths and do the maths questions, then the heading Science and do the science questions. Scan all pages and send once.
+              </p>
+            )}
           </div>
         )}
 

@@ -32,8 +32,11 @@ Deno.serve(async (req) => {
       .from("profiles").select("id, role, student_id").eq("username", u).maybeSingle();
     if (!profile || profile.role !== "student" || !profile.student_id) return json({ error: "not_found" }, 404);
 
-    const { data: student } = await admin.from("students").select("left_on").eq("id", profile.student_id).maybeSingle();
+    const { data: student } = await admin.from("students").select("left_on, branch").eq("id", profile.student_id).maybeSingle();
     if (!student || student.left_on) return json({ error: "not_found" }, 404);
+    // One-to-one students (branch Personal, e.g. Shivansh) sign in with their password, never by name alone
+    // (Aman, 26 Nov 2026).
+    if (student.branch === "Personal") return json({ error: "not_found" }, 404);
 
     const { data: user } = await admin.auth.admin.getUserById(profile.id);
     const email = user?.user?.email;

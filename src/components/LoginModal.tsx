@@ -55,6 +55,12 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setBusy(true);
     // No password and no "@": a student signing in by name.
     const byName = password.length === 0 && !identifier.includes("@");
+    // Shivansh's page is behind a password (Aman, 26 Nov 2026); a name alone is not enough.
+    if (byName && identifier.trim().toLowerCase().replace(/\s+/g, "") === "shivansh") {
+      setBusy(false);
+      setError("Shivansh, type your password too.");
+      return;
+    }
     const message = byName ? await signInByName(identifier) : await signIn(identifier, password);
     setBusy(false);
 
@@ -122,7 +128,7 @@ export const LoginModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <input
                 type={show ? "text" : "password"}
                 autoComplete="current-password"
-                placeholder="Password (teachers only)"
+                placeholder="Password (teachers and Shivansh)"
                 value={password}
                 onChange={(e) => {
                   setError(null);

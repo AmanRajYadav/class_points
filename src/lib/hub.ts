@@ -184,7 +184,7 @@ export async function markAttendance(
     student_id: studentId,
     date,
     status,
-  });
+  }, { onConflict: "student_id,date" });
   guard(error);
 }
 
@@ -201,7 +201,8 @@ export async function markAttendanceBulk(
       student_id: studentId,
       date,
       status,
-    }))
+    })),
+    { onConflict: "student_id,date" }
   );
   guard(error);
 }

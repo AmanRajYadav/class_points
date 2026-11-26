@@ -354,7 +354,7 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
 
   // --- Search & Filter ---
   const [studentSearch, setStudentSearch] = useState<string>("");
-  const [selectedBranchFilter, setSelectedBranchFilter] = useState<"All" | "Mangla" | "Sarkanda">("All");
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<"All" | "Mangla" | "Sarkanda" | "Personal">("All");
 
   // --- Modals & Overlays ---
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
@@ -395,13 +395,20 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
   // --- Search and Branch filtered students list ---
   const filteredStudents = useMemo(() => {
     let list = studentScores;
-    if (selectedBranchFilter !== "All") {
+    // A one-to-one student (branch "Personal", e.g. Shivansh, Class 7) sees only
+    // himself; the class board never mixes him into the Class 10 ranking.
+    const myBranch = studentId ? state.students.find((s) => s.id === studentId)?.branch : undefined;
+    if (myBranch === "Personal") {
+      list = list.filter((s) => s.student.id === studentId);
+    } else if (selectedBranchFilter !== "All") {
       list = list.filter((s) => s.student.branch === selectedBranchFilter);
+    } else {
+      list = list.filter((s) => s.student.branch !== "Personal");
     }
     if (!studentSearch.trim()) return list;
     const q = studentSearch.toLowerCase();
     return list.filter((s) => s.student.name.toLowerCase().includes(q));
-  }, [studentScores, studentSearch, selectedBranchFilter]);
+  }, [studentScores, studentSearch, selectedBranchFilter, studentId, state.students]);
 
   // --- Leaderboard Rankings by Branch ---
   const manglaRanked = useMemo(() => {
@@ -1055,6 +1062,18 @@ function Scoreboard({ app, state }: { app: AppController; state: AppState }) {
                   >
                     Sarkanda ({state.students.filter(s => s.branch === 'Sarkanda').length})
                   </button>
+                  {teachMode && state.students.some((s) => s.branch === "Personal") && (
+                    <button
+                      onClick={() => setSelectedBranchFilter("Personal")}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        selectedBranchFilter === "Personal"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {state.students.filter((s) => s.branch === "Personal").map((s) => s.name).join(", ")}
+                    </button>
+                  )}
                 </div>
 
                 {/* Quick actions for teacher */}

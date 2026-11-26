@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, TrophyWinner } from "../types";
-import { applyWriteOp, closeDueCycles, fetchAppState, subscribeToChanges, WriteOp } from "./db";
+import { applyWriteOp, closeDueCycles, fetchAppState, ServerRejectedError, subscribeToChanges, WriteOp } from "./db";
 import { isSupabaseConfigured } from "./supabase";
 import { formatDateString, readCachedState, writeCachedState } from "./storage";
 
@@ -54,6 +54,10 @@ export function useAppState() {
   const flushingRef = useRef(false);
   const retryTimerRef = useRef<number | null>(null);
   const attemptRef = useRef(0);
+  /** Failures of the op at the head of the queue, and whether one was dropped. */
+  const headFailsRef = useRef(0);
+  const droppedRef = useRef(false);
+  const loadRef = useRef<((opts?: { background?: boolean }) => Promise<void>) | null>(null);
   const mountedRef = useRef(true);
   /** Calendar day the rollover check last ran, to keep it to once a day. */
   const lastRolloverCheckRef = useRef<string | null>(null);
@@ -89,7 +93,22 @@ export function useAppState() {
       while (queueRef.current.length > 0) {
         // Peek, don't shift: a failed op must stay at the head so ordering
         // survives a retry.
-        await applyWriteOp(queueRef.current[0]);
+        try {
+          await applyWriteOp(queueRef.current[0]);
+          headFailsRef.current = 0;
+        } catch (opErr) {
+          // A write the server refused three times in a row is not a network
+          // problem and will never succeed as it is. Keeping it at the head
+          // used to block every later tap and stop the board reloading, so
+          // drop it, say so, and reload what the server really has.
+          if (opErr instanceof ServerRejectedError && ++headFailsRef.current >= 3) {
+            console.warn("Dropping a write the server keeps refusing:", opErr.code, opErr.message, queueRef.current[0]);
+            headFailsRef.current = 0;
+            droppedRef.current = true;
+          } else {
+            throw opErr;
+          }
+        }
         queueRef.current = queueRef.current.slice(1);
         persistQueue(queueRef.current);
         if (mountedRef.current) syncQueueCount();
@@ -99,6 +118,10 @@ export function useAppState() {
       if (mountedRef.current) {
         setError(null);
         setStatus("synced");
+        if (droppedRef.current) {
+          droppedRef.current = false;
+          void loadRef.current?.({ background: true });
+        }
       }
     } catch (err) {
       if (!mountedRef.current) return;
@@ -162,7 +185,13 @@ export function useAppState() {
         let closed: TrophyWinner[] = [];
         if (!background || lastRolloverCheckRef.current !== today) {
           lastRolloverCheckRef.current = today;
-          closed = await closeDueCycles();
+          // A failed period check must not take the whole board offline: the
+          // hourly server job closes periods anyway.
+          try {
+            closed = await closeDueCycles();
+          } catch (e) {
+            console.warn("closeDueCycles failed; the hourly job will close the period", e);
+          }
           if (!mountedRef.current) return;
         }
 
@@ -190,6 +219,7 @@ export function useAppState() {
     },
     [commit, enqueue]
   );
+  loadRef.current = load;
 
   // -- wiring --------------------------------------------------------------
 

@@ -3,7 +3,7 @@ export interface Student {
   name: string;
   avatarId: number; // Index from 0 to 15
   createdAt: string; // ISO string
-  branch: 'Mangla' | 'Sarkanda';
+  branch: 'Mangla' | 'Sarkanda' | 'Personal';
 }
 
 export interface DailyPoint {
@@ -31,7 +31,7 @@ export interface TrophyWinner {
   studentName: string;
   avatarId: number;
   score: number;
-  branch: 'Mangla' | 'Sarkanda';
+  branch: 'Mangla' | 'Sarkanda' | 'Personal';
   cycleStartDate: string;
   cycleEndDate: string;
   awardedAt: string; // ISO string
