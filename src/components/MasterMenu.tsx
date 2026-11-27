@@ -46,6 +46,15 @@ const TILES: Tile[] = [
     icon: FileUp,
     tint: "bg-rose-50 text-rose-600 border-rose-100",
   },
+  // Aman, 27 Nov 2026: the daily Instagram task = 5 Maths, 5 Science, 5 SST questions from the books.
+  {
+    view: "daily",
+    label: "Daily questions",
+    hint: "5 Maths, 5 Science, 5 SST for Instagram, copy in one tap",
+    icon: Instagram,
+    tint: "bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100",
+    teachOnly: true,
+  },
   // Staff only. The database refuses students too; hiding the tile is a courtesy.
   {
     view: "exams",
@@ -198,29 +207,6 @@ export const MasterMenu: React.FC<Props> = ({ counts, canManage, canTeach, onOpe
         );
       })}
     </div>
-
-    {/* Aman, 27 Nov 2026: "the daily task I have to give on Instagram... where is it?" It is the Daily
-        Playbook page on claude.ai (his account), not part of this app, so the tile opens it. */}
-    {canTeach && (
-      <a
-        href="https://claude.ai/artifact/PGw3QkYQCErmvtMF2uNi42"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-3 bg-white rounded-3xl border border-slate-200/80 p-4 hover:border-slate-300 hover:shadow-sm transition-all"
-      >
-        <div className="w-11 h-11 rounded-2xl border flex items-center justify-center bg-fuchsia-50 text-fuchsia-600 border-fuchsia-100 shrink-0">
-          <Instagram className="w-5 h-5" />
-        </div>
-        <div className="min-w-0">
-          <h3 className="font-black text-slate-800 text-sm flex items-center gap-1">
-            Daily Playbook <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
-          </h3>
-          <p className="text-[11px] text-slate-400 font-semibold leading-snug mt-0.5">
-            Today's story, channel posts and task, with copy buttons (opens claude.ai)
-          </p>
-        </div>
-      </a>
-    )}
 
     <UpdateFooter />
   </div>
