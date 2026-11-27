@@ -408,6 +408,78 @@ const StudentSide: React.FC<{ studentId: string }> = ({ studentId }) => {
 // ---------------------------------------------------------------------------
 // Staff
 // ---------------------------------------------------------------------------
+
+/** The day's homework as set, every class (Sarkanda, Mangla, Aarna, Shivansh), with answers. Staff only. */
+type SetRow = { branch: string; data: { title?: string; common?: [string, string][]; science?: [string, string][]; swap?: Record<string, unknown> } };
+const NICE_BRANCH: Record<string, string> = { Personal: "Shivansh" };
+const HomeworkSets: React.FC<{ hwDate: string }> = ({ hwDate }) => {
+  const [rows, setRows] = useState<SetRow[] | null>(null);
+  const [open, setOpen] = useState<string>("");
+  const [answers, setAnswers] = useState(false);
+  useEffect(() => {
+    setRows(null);
+    void supabase.from("homework_days").select("branch,data").eq("hw_date", hwDate).then(({ data }) => {
+      const order = ["Sarkanda", "Mangla", "Aarna", "Personal", "Shivansh"];
+      const list = ((data ?? []) as SetRow[]).sort((a, b) => order.indexOf(a.branch) - order.indexOf(b.branch));
+      setRows(list);
+      setOpen((cur) => (list.some((r) => r.branch === cur) ? cur : list[0]?.branch ?? ""));
+    });
+  }, [hwDate]);
+  const row = rows?.find((r) => r.branch === open);
+  const section = (label: string, list: [string, string][] | undefined, tone: string) =>
+    list && list.length > 0 ? (
+      <div className="mt-2">
+        <p className={`text-[10px] font-black uppercase tracking-wider mb-1.5 ${tone}`}>{label} · {list.length}</p>
+        <ol className="list-decimal pl-5 space-y-2 text-[13px] leading-snug text-slate-700 font-medium">
+          {list.map(([q, a], i) => (
+            <li key={i}>
+              {plain(q)}
+              {answers && a && <span className="block text-[12px] text-emerald-700 font-semibold mt-0.5">Ans: {plain(a)}</span>}
+            </li>
+          ))}
+        </ol>
+      </div>
+    ) : null;
+  return (
+    <div className="bg-white rounded-3xl border border-slate-200/80 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400">Homework given · {niceDate(hwDate)}</h3>
+        {row && (
+          <button onClick={() => setAnswers((v) => !v)} className="text-[11px] font-black px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 cursor-pointer">
+            {answers ? "Hide answers" : "Show answers"}
+          </button>
+        )}
+      </div>
+      {rows === null && <p className="text-xs text-slate-400 font-semibold mt-2">Loading…</p>}
+      {rows && rows.length === 0 && <p className="text-xs text-slate-400 font-semibold mt-2">No homework was set for this day yet (the night machine adds it).</p>}
+      {rows && rows.length > 0 && (
+        <>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {rows.map((r) => (
+              <button
+                key={r.branch}
+                onClick={() => setOpen(r.branch)}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider cursor-pointer ${open === r.branch ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"}`}
+              >
+                {NICE_BRANCH[r.branch] ?? r.branch}
+              </button>
+            ))}
+          </div>
+          {row && (
+            <div className="mt-1">
+              {section("Maths", row.data.common, "text-amber-700")}
+              {section("Science", row.data.science, "text-emerald-700")}
+              {row.data.swap && Object.keys(row.data.swap).length > 0 && (
+                <p className="text-[11px] text-slate-400 font-semibold mt-2">Some children get a different question in place of one of these (their own list is on their screen).</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
   const [hwDate, setHwDate] = useState(istDate());
   const [rows, setRows] = useState<Submission[]>([]);
@@ -531,6 +603,8 @@ const StaffSide: React.FC<{ students: Student[] }> = ({ students }) => {
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
         />
       </div>
+
+      <HomeworkSets hwDate={hwDate} />
 
       {branches.map((branch) => {
         const list = students.filter((s) => (s.branch as string) === branch).sort((a, b) => a.name.localeCompare(b.name));
